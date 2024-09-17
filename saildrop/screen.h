@@ -3,8 +3,11 @@
 
 class Screen {
     public:
-        void on_swipe_up();
-        void on_swipe_down();
+        lv_obj_t *scr; 
+
+        void on_swipe_up() {}
+        void on_swipe_down() {}
+        void on_tick(uint32_t tick) {}
 };
 
 #endif
