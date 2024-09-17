@@ -7,7 +7,6 @@ class Screen {
 
         void on_swipe_up() {}
         void on_swipe_down() {}
-        void on_tick(uint32_t tick) {}
 };
 
 #endif

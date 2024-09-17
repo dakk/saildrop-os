@@ -2,7 +2,8 @@
 #define SPLASHSCREEN_H
 
 #include "screen.h"
-#include "conn.h"
+#include "../conn.h"
+#include "../conf.h"
 
 class SplashScreen : public Screen {
     private:
@@ -13,7 +14,7 @@ class SplashScreen : public Screen {
             on_complete = on_complete_f;
             scr = lv_obj_create(NULL);
             lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
-            // lv_obj_set_style_bg_color(scr, lv_color_hex(0xffffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
+            // lv_obj_set_style_bg_color(scr, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
             // lv_obj_set_style_bg_opa(scr, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
             // lv_obj_t* splash_bg = lv_img_create(scr);
@@ -28,7 +29,7 @@ class SplashScreen : public Screen {
             lv_obj_set_width(splash_label, LV_SIZE_CONTENT);
             lv_obj_set_height(splash_label, LV_SIZE_CONTENT); 
             lv_obj_set_x(splash_label, 2);
-            lv_obj_set_y(splash_label, 40);
+            lv_obj_set_y(splash_label, SCREEN_HEIGHT/2);
             lv_obj_set_align(splash_label, LV_ALIGN_TOP_MID);
             lv_label_set_text(splash_label, "SAILDROP");
             // lv_obj_set_style_text_color(splash_label, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -36,16 +37,15 @@ class SplashScreen : public Screen {
             // lv_obj_set_style_text_font(splash_label, &lv_font_montserrat_44, LV_PART_MAIN | LV_STATE_DEFAULT);
 
             lv_obj_t * spinner = lv_spinner_create(scr, 1000, 60);
-            lv_obj_set_size(spinner, 60, 60);
+            lv_obj_set_style_bg_color(spinner, lv_color_hex(0xfc6203), LV_PART_INDICATOR);
+            lv_obj_set_style_bg_color(spinner, lv_color_hex(0x0), LV_PART_MAIN);
+            lv_obj_set_size(spinner, SCREEN_WIDTH, SCREEN_HEIGHT);
             lv_obj_center(spinner);
         }
 
         void load() {
             list_networks();
             on_complete();
-        }
-
-        void on_tick(uint32_t tick) {
         }
 };
 

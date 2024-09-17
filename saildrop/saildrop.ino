@@ -3,26 +3,23 @@
 #include "lv_conf.h"
 #include "CST816S.h"
 #include "conn.h"
-#include "speedgauge.h"
-#include "windgauge.h"
+#include "conf.h"
 
-#include "splashscreen.h"
+#include "screens/screen.h"
+#include "screens/speedscreen.h"
+#include "screens/windscreen.h"
+#include "screens/splashscreen.h"
 
-#define LVGL_TICK_PERIOD_MS 2
-
-/*Change to your screen resolution*/
-static const uint16_t screenWidth = 240;
-static const uint16_t screenHeight = 240;
 
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[screenWidth * screenHeight / 10];
+static lv_color_t buf[SCREEN_WIDTH * SCREEN_HEIGHT / 10];
 
-static lv_obj_t *screens[2];
+static Screen *screens[2];
 static const uint8_t num_screens = 2;
 int current_screen = 0;
 Screen *splash;
 
-TFT_eSPI tft = TFT_eSPI(screenWidth, screenHeight); /* TFT instance */
+TFT_eSPI tft = TFT_eSPI(SCREEN_WIDTH, SCREEN_HEIGHT); /* TFT instance */
 CST816S touch(6, 7, 13, 5);                         // sda, scl, rst, irq
 
 TaskHandle_t core2_loop_task;
@@ -38,6 +35,9 @@ enum SAILDROP_STATUS
 };
 
 SAILDROP_STATUS status = BOOT;
+uint32_t tick = 0;
+uint32_t last_handled_gesture_tick = 0;
+
 
 void core2_loop(void *arg)
 {
@@ -76,6 +76,7 @@ void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *c
     lv_disp_flush_ready(disp_drv);
 }
 
+
 void on_tick(void *arg)
 {
     /* Tell LVGL how many milliseconds has elapsed */
@@ -109,18 +110,20 @@ void my_touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
 
         Serial.println(touch.gesture());
 
-        if (status != RUNNING)
+        if (status != RUNNING || (tick - last_handled_gesture_tick) < 100)
             return;
 
         if (touch.data.gestureID == SWIPE_LEFT)
         {
             current_screen = abs((current_screen - 1) % num_screens);
-            lv_scr_load_anim(screens[current_screen], LV_SCR_LOAD_ANIM_MOVE_LEFT, 100, 0, false);
+            lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, 100, 0, false);
+            last_handled_gesture_tick = tick;
         }
         else if (touch.data.gestureID == SWIPE_RIGHT)
         {
             current_screen = (current_screen + 1) % num_screens;
-            lv_scr_load_anim(screens[current_screen], LV_SCR_LOAD_ANIM_MOVE_RIGHT, 100, 0, false);
+            lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 100, 0, false);
+            last_handled_gesture_tick = tick;
         }
     }
 }
@@ -132,7 +135,7 @@ void on_loading_completed()
 
 void setup()
 {
-    Serial.begin(115200); /* prepare for possible serial debug */
+    Serial.begin(115200);
 
     String LVGL_Arduino = "Hello Arduino! ";
     LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
@@ -155,14 +158,14 @@ void setup()
     // tft.setTouch( calData );
     touch.begin();
 
-    lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * screenHeight / 10);
+    lv_disp_draw_buf_init(&draw_buf, buf, NULL, SCREEN_WIDTH * SCREEN_HEIGHT / 10);
 
     /*Initialize the display*/
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
     /*Change the following line to your display resolution*/
-    disp_drv.hor_res = screenWidth;
-    disp_drv.ver_res = screenHeight;
+    disp_drv.hor_res = SCREEN_WIDTH;
+    disp_drv.ver_res = SCREEN_HEIGHT;
     disp_drv.flush_cb = my_disp_flush;
     disp_drv.draw_buf = &draw_buf;
     lv_disp_drv_register(&disp_drv);
@@ -175,29 +178,8 @@ void setup()
     lv_indev_drv_register(&indev_drv);
 
     //////////////// Create screens
-
-    // Wind screen
-    lv_obj_t *ui_wind_scr = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_wind_scr, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-    lv_obj_set_style_bg_color(ui_wind_scr, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(ui_wind_scr, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    WindGauge *wind_gauge = new WindGauge(ui_wind_scr, screenWidth, screenHeight);
-    wind_gauge->set_direction(33);
-    wind_gauge->set_speed(20);
-    wind_gauge->showcase();
-
-    // Speed screen
-    lv_obj_t *ui_speed_scr = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_speed_scr, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-    lv_obj_set_style_bg_color(ui_speed_scr, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(ui_speed_scr, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    SpeedGauge *speed_gauge = new SpeedGauge(ui_speed_scr, screenWidth, screenHeight);
-
-    // Load first screen
-    screens[0] = ui_wind_scr;
-    screens[1] = ui_speed_scr;
+    screens[0] = new WindScreen();
+    screens[1] = new SpeedScreen();
     current_screen = 0;
     // lv_disp_load_scr(ui_wind_scr);
 
@@ -231,13 +213,14 @@ void setup()
 
 void loop()
 {
+    tick ++;
     if (status == LOADING_COMPLETED)
     {
         status = RUNNING;
-        lv_disp_load_scr(screens[current_screen]);
+        lv_disp_load_scr(screens[current_screen]->scr);
         // lv_scr_load_anim(screens[current_screen], LV_SCR_LOAD_ANIM_MOVE_RIGHT, 100, 0, false);
     }
 
     lv_timer_handler();
-    delay(5);
+    delay(LOOP_DELAY);
 }

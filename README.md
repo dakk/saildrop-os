@@ -11,4 +11,5 @@ It provides a package with fixed version libraries, use their tft.
 - lvgl8
 - tft
 
-https://github.com/lvgl/lvgl/blob/v8.3.11/example
+https://github.com/lvgl/lvgl/blob/v8.3.11/examples
+https://docs.lvgl.io/8.4/widgets/extra/index.html
