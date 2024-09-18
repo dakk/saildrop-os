@@ -6,6 +6,7 @@
 #include "conf.h"
 
 #include "screens/screen.h"
+#include "screens/compassscreen.h"
 #include "screens/speedscreen.h"
 #include "screens/windscreen.h"
 #include "screens/splashscreen.h"
@@ -14,8 +15,8 @@
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[SCREEN_WIDTH * SCREEN_HEIGHT / 10];
 
-static Screen *screens[2];
-static const uint8_t num_screens = 2;
+static Screen *screens[8];
+static const uint8_t num_screens = 3;
 int current_screen = 0;
 Screen *splash;
 
@@ -180,6 +181,7 @@ void setup()
     //////////////// Create screens
     screens[0] = new WindScreen();
     screens[1] = new SpeedScreen();
+    screens[2] = new CompassScreen();
     current_screen = 0;
     // lv_disp_load_scr(ui_wind_scr);
 

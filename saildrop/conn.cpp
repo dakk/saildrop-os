@@ -1,12 +1,41 @@
 #include <WiFi.h>
+#include <WiFiUdp.h>
 #include "conn.h"
 
 String networks[32];
 uint8_t n_networks = 0;
+bool connected = false;
+
+// password = 12345678
+uint32_t port = 2000;
+// IP: 192.168.4.1
+
+WiFiUDP udp;
+char packetBuffer[255];
 
 void initialize_connections()
 {
     WiFi.mode(WIFI_STA);
+    WiFi.onEvent(on_wifi_event);
+}
+
+void on_wifi_event(WiFiEvent_t event) {
+  switch (event) {
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+      //When connected set
+      Serial.print("WiFi connected! IP address: ");
+      Serial.println(WiFi.localIP());
+      //initializes the UDP state
+      //This initializes the transfer buffer
+      udp.begin(port);
+      connected = true;
+      break;
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+      Serial.println("WiFi lost connection");
+      connected = false;
+      break;
+    default: break;
+  }
 }
 
 void list_networks()
@@ -56,6 +85,18 @@ void connect_wifi(const char *ssid, const char *password)
         delay(1000);
     }
     Serial.println(WiFi.localIP());
+}
+
+
+void conn_loop() {
+    int packetSize = udp.parsePacket();
+    Serial.print(" Received packet from : "); Serial.println(udp.remoteIP());
+    Serial.print(" Size : "); Serial.println(packetSize);
+    if (packetSize) {
+        int len = udp.read(packetBuffer, 255);
+        if (len > 0) packetBuffer[len - 1] = 0;
+        Serial.printf("Data : %s\n", packetBuffer);
+    }
 }
 
 void disconnect_wifi()

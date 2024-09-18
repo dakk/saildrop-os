@@ -10,6 +10,7 @@ public:
     lv_obj_t *meter;
     lv_meter_indicator_t *indic;
     lv_obj_t *speed_label;
+    lv_obj_t * speed_arc;
 
     SpeedGauge(lv_obj_t *parent, int width, int height);
     void set_speed(int32_t speed);
@@ -65,10 +66,39 @@ SpeedGauge::SpeedGauge(lv_obj_t *parent, int width, int height)
     speed_label = lv_label_create(meter);
     lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, 40);
     lv_label_set_text(speed_label, "0.0 kts");
+
+
+    // Speed arc
+    speed_arc = lv_arc_create(parent);
+
+    lv_obj_set_style_arc_width(speed_arc, 10, LV_PART_MAIN );
+    lv_obj_set_style_arc_width(speed_arc, 10, LV_PART_INDICATOR);
+    // lv_obj_set_style_arc_color(spinner, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(speed_arc, lv_palette_darken(LV_PALETTE_BLUE, 3), LV_PART_INDICATOR);
+
+    lv_obj_remove_style(speed_arc, NULL, LV_PART_KNOB);   /*Be sure the knob is not displayed*/
+    lv_obj_clear_flag(speed_arc, LV_OBJ_FLAG_CLICKABLE);  /*To not allow adjusting by click*/
+    
+    lv_arc_set_rotation(speed_arc, 0);
+    lv_arc_set_bg_angles(speed_arc, 0, 270);
+    lv_arc_set_start_angle(speed_arc, 0);
+
+    lv_obj_set_size(speed_arc, SCREEN_WIDTH, SCREEN_HEIGHT);
+    lv_obj_center(speed_arc);
 }
 
 void SpeedGauge::set_speed(int32_t speed)
 {
+    lv_arc_set_end_angle(speed_arc, 270 * speed / 150);
+
+    if (speed < 30) 
+        lv_obj_set_style_arc_color(speed_arc, lv_palette_darken(LV_PALETTE_BLUE, 3), LV_PART_INDICATOR);
+    else if (speed > 100) 
+        lv_obj_set_style_arc_color(speed_arc, lv_palette_darken(LV_PALETTE_RED, 3), LV_PART_INDICATOR);
+    else 
+        lv_obj_set_style_arc_color(speed_arc, lv_palette_darken(LV_PALETTE_GREEN, 3), LV_PART_INDICATOR);
+
+
     lv_meter_set_indicator_value(meter, indic, speed / 10);
 
     char buf[20];
@@ -86,7 +116,7 @@ void SpeedGauge::showcase()
     lv_anim_set_time(&a, 2000);
     lv_anim_set_repeat_delay(&a, 100);
     lv_anim_set_playback_time(&a, 500);
-    lv_anim_set_playback_delay(&a, 100);
+    lv_anim_set_playback_delay(&a, 300);
     lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
     lv_anim_start(&a);
 }
