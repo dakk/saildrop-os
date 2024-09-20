@@ -110,7 +110,7 @@ Compass::Compass(lv_obj_t *parent, int width, int height)
     container = lv_obj_create(parent);
     lv_obj_set_size(container, width, height);
     lv_obj_center(container);
-    lv_obj_set_style_bg_color(container, lv_color_hex(0x000080), 0); // Navy blue background
+    // lv_obj_set_style_bg_color(container, lv_color_hex(0x000000), 0); // Navy blue background
     lv_obj_set_style_border_width(container, 0, 0);
 
     center_x = width / 2;

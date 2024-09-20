@@ -34,7 +34,7 @@ class SplashScreen : public Screen {
             lv_label_set_text(splash_label, "SAILDROP");
             // lv_obj_set_style_text_color(splash_label, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
             // lv_obj_set_style_text_opa(splash_label, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-            // lv_obj_set_style_text_font(splash_label, &lv_font_montserrat_44, LV_PART_MAIN | LV_STATE_DEFAULT);
+            // lv_obj_set_style_text_font(splash_label, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
 
             lv_obj_t * spinner = lv_spinner_create(scr, 1000, 60);
 

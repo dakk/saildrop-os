@@ -10,13 +10,14 @@
 #include "screens/speedscreen.h"
 #include "screens/windscreen.h"
 #include "screens/splashscreen.h"
+#include "screens/valuesscreen.h"
 
 
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[SCREEN_WIDTH * SCREEN_HEIGHT / 10];
 
 static Screen *screens[8];
-static const uint8_t num_screens = 3;
+static const uint8_t num_screens = 4;
 int current_screen = 0;
 Screen *splash;
 
@@ -48,6 +49,7 @@ void core2_loop(void *arg)
         {
             status = LOADING_TRIGGERED;
             ((SplashScreen *)splash)->load();
+            connect_wifi(WIFI_DEFAULT_SSID, WIFI_DEFAULT_PASSWORD);
         }
 
         delay(100);
@@ -99,16 +101,6 @@ void my_touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
     else
     {
         data->state = LV_INDEV_STATE_PR;
-
-        /*Set the coordinates*/
-        // data->point.x = touch.data.x;
-        // data->point.y = touch.data.y;
-        // Serial.print( "Data x " );
-        // Serial.println( touch.data.x );
-
-        // Serial.print( "Data y " );
-        // Serial.println( touch.data.y );
-
         Serial.println(touch.gesture());
 
         if (status != RUNNING || (tick - last_handled_gesture_tick) < 100)
@@ -126,6 +118,17 @@ void my_touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
             lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 100, 0, false);
             last_handled_gesture_tick = tick;
         }
+        else if (touch.data.gestureID == SWIPE_UP)
+        {
+            screens[current_screen]->on_swipe_up();
+            last_handled_gesture_tick = tick;
+        }
+        else if (touch.data.gestureID == SWIPE_DOWN)
+        {
+            screens[current_screen]->on_swipe_down();
+            last_handled_gesture_tick = tick;
+        }
+
     }
 }
 
@@ -182,7 +185,8 @@ void setup()
     screens[0] = new WindScreen();
     screens[1] = new SpeedScreen();
     screens[2] = new CompassScreen();
-    current_screen = 0;
+    screens[3] = new ValuesScreen();
+    current_screen = 3;
     // lv_disp_load_scr(ui_wind_scr);
 
     splash = new SplashScreen(&on_loading_completed);
