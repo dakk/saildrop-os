@@ -9,12 +9,47 @@ lv_obj_t *default_screen_create() {
     return scr;
 }
 
+
 class Screen {
     public:
         lv_obj_t *scr; 
 
         virtual void on_swipe_up() {}
         virtual void on_swipe_down() {}
+};
+
+
+class MultiScreen : public Screen
+{
+protected:
+    lv_obj_t *screens[8];
+    uint8_t current_screen;
+    uint8_t num_screens;
+
+public:
+    MultiScreen(uint8_t ns)
+    {
+        num_screens = ns;
+
+        for (int j; j < num_screens; j++) {
+            screens[j] = default_screen_create();
+        }
+        scr = screens[0];
+    }
+
+    virtual void on_swipe_up() override
+    {
+        current_screen = abs((current_screen - 1) % num_screens);
+        lv_scr_load_anim(screens[current_screen], LV_SCR_LOAD_ANIM_FADE_ON, 100, 0, false);
+        scr = screens[current_screen];
+    }
+
+    virtual void on_swipe_down() override
+    {
+        current_screen = (current_screen + 1) % num_screens;
+        lv_scr_load_anim(screens[current_screen], LV_SCR_LOAD_ANIM_FADE_ON, 100, 0, false);
+        scr = screens[current_screen];
+    }
 };
 
 #endif

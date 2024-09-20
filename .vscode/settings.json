@@ -3,6 +3,8 @@
     "files.associations": {
         "*.ipp": "cpp",
         "hash_map": "cpp",
-        "complex": "cpp"
+        "complex": "cpp",
+        "cstdint": "cpp",
+        "lv_color.h": "c"
     }
 }

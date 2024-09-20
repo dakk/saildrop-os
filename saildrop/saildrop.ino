@@ -11,15 +11,22 @@
 #include "screens/windscreen.h"
 #include "screens/splashscreen.h"
 #include "screens/valuesscreen.h"
+#include "screens/tackscreen.h"
+#include "screens/timerscreen.h"
 
 
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[SCREEN_WIDTH * SCREEN_HEIGHT / 10];
 
-static Screen *screens[8];
-static const uint8_t num_screens = 4;
+static Screen *screens[16];
 int current_screen = 0;
+uint8_t num_screens = 0;
 Screen *splash;
+
+void add_screen(Screen *sc) {
+    screens[num_screens] = sc;
+    num_screens ++;
+}
 
 TFT_eSPI tft = TFT_eSPI(SCREEN_WIDTH, SCREEN_HEIGHT); /* TFT instance */
 CST816S touch(6, 7, 13, 5);                         // sda, scl, rst, irq
@@ -182,12 +189,13 @@ void setup()
     lv_indev_drv_register(&indev_drv);
 
     //////////////// Create screens
-    screens[0] = new WindScreen();
-    screens[1] = new SpeedScreen();
-    screens[2] = new CompassScreen();
-    screens[3] = new ValuesScreen();
+    add_screen(new WindScreen());
+    add_screen(new SpeedScreen());
+    add_screen(new CompassScreen());
+    add_screen(new ValuesScreen());
+    add_screen(new TackScreen());
+    add_screen(new TimerScreen());
     current_screen = 3;
-    // lv_disp_load_scr(ui_wind_scr);
 
     splash = new SplashScreen(&on_loading_completed);
     lv_disp_load_scr(splash->scr);
