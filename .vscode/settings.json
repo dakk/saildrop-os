@@ -5,6 +5,11 @@
         "hash_map": "cpp",
         "complex": "cpp",
         "cstdint": "cpp",
-        "lv_color.h": "c"
+        "lv_color.h": "c",
+        "bitset": "cpp",
+        "memory": "cpp",
+        "chrono": "cpp",
+        "cstdlib": "cpp",
+        "export": "cpp"
     }
 }

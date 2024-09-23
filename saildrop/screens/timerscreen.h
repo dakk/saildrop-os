@@ -1,15 +1,24 @@
 #ifndef TIMERSCREEN_H
 #define TIMERSCREEN_H
 
+#include "../gauges/timergauge.h"
 #include "screen.h"
 
-class TimerScreen : public Screen
+class TimerScreen : public MultiScreen
 {
 private:
+    TimerGauge *timer;
+
 public:
-    TimerScreen()
+    TimerScreen() : MultiScreen(2)
     {
-        scr = default_screen_create();
+        // Screen 1: Timer
+        timer = new TimerGauge(screens[0], SCREEN_WIDTH, SCREEN_HEIGHT, 60*5, LV_PALETTE_BLUE);
+
+        // Setup timers
+        
+
+        // Screen 2: Settings
     }
 };
 

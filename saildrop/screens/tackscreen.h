@@ -3,13 +3,15 @@
 
 #include "screen.h"
 
-class TackScreen : public Screen
+class TackScreen : public MultiScreen
 {
 private:
 public:
-    TackScreen()
+    TackScreen() : MultiScreen(2)
     {
-        scr = default_screen_create();
+        // Screen 1: Tack angles
+
+        // Screen 2: Settings
     }
 };
 

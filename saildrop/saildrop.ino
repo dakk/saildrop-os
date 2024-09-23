@@ -87,6 +87,7 @@ void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *c
 }
 
 
+/* Seconds timer */
 void on_tick(void *arg)
 {
     /* Tell LVGL how many milliseconds has elapsed */
@@ -195,7 +196,7 @@ void setup()
     add_screen(new ValuesScreen());
     add_screen(new TackScreen());
     add_screen(new TimerScreen());
-    current_screen = 3;
+    current_screen = 5;
 
     splash = new SplashScreen(&on_loading_completed);
     lv_disp_load_scr(splash->scr);
