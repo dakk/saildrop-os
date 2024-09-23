@@ -4,21 +4,25 @@
 #include "../gauges/timergauge.h"
 #include "screen.h"
 
-class TimerScreen : public MultiScreen
+class TimerScreen : public Screen
 {
 private:
     TimerGauge *timer;
 
 public:
-    TimerScreen() : MultiScreen(2)
+    TimerScreen() : Screen()
     {
-        // Screen 1: Timer
-        timer = new TimerGauge(screens[0], SCREEN_WIDTH, SCREEN_HEIGHT, 60*5, LV_PALETTE_BLUE);
+        timer = new TimerGauge(scr, SCREEN_WIDTH, SCREEN_HEIGHT, 60*5, LV_PALETTE_BLUE);
+    }
 
-        // Setup timers
-        
+    virtual void on_swipe_up() override
+    {
+        timer->increase_secs();
+    }
 
-        // Screen 2: Settings
+    virtual void on_swipe_down() override
+    {
+        timer->decrese_secs();
     }
 };
 

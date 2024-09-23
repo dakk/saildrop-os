@@ -8,10 +8,8 @@ class CompassScreen : public Screen
 {
 private:
 public:
-    CompassScreen()
+    CompassScreen() : Screen()
     {
-        scr = default_screen_create();
-
         Compass *compass = new Compass(scr, SCREEN_WIDTH, SCREEN_HEIGHT);
         compass->showcase();
     }

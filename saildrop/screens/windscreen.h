@@ -8,10 +8,8 @@ class WindScreen : public Screen
 {
 private:
 public:
-    WindScreen()
+    WindScreen() : Screen()
     {
-        scr = default_screen_create();
-
         WindGauge *wind_gauge = new WindGauge(scr, SCREEN_WIDTH, SCREEN_HEIGHT);
         wind_gauge->showcase();
     }

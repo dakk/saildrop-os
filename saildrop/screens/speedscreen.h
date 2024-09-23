@@ -8,10 +8,8 @@ class SpeedScreen : public Screen
 {
 private:
 public:
-    SpeedScreen()
+    SpeedScreen() : Screen()
     {
-        scr = default_screen_create();
-
         SpeedGauge *speed_gauge = new SpeedGauge(scr, SCREEN_WIDTH, SCREEN_HEIGHT);
         speed_gauge->showcase();
     }
