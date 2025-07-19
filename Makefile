@@ -11,10 +11,10 @@ JOBS ?= $(shell nproc)
 # ~/.arduino15/packages/esp32/hardware/esp32/2.0.12/platform.txt
 # cat ~/.arduino15/packages/esp32/hardware/esp32/2.0.12/boards.txt | grep esp32s3
 
-BOARD_OPTIONS = --board-options PSRAM=enabled,PartitionScheme=app3M_fat9M_16MB,FlashSize=16M
+BOARD_OPTIONS = --board-options PSRAM=enabled,FlashSize=16M # ,PartitionScheme=app3M_fat9M_16MB
 BUILD_PROPERTY = --build-property build.flash_size=16MB \
-	--build-property build.partitions=app3M_fat9M_16MB \
 	--build-property build.psram=enabled
+# 	--build-property build.partitions=app3M_fat9M_16MB
 
 .PHONY: all compile upload monitor
 
@@ -27,7 +27,6 @@ install-prereq:
 	arduino-cli core install esp32:esp32@2.0.12
 
 compile:
-	cp lv_conf.h ~/Arduino/libraries/lvgl/
 	cp lv_conf.h ~/Arduino/libraries/lvgl/src/
 	arduino-cli compile -v $(BUILD_PROPERTY) $(BOARD_OPTIONS) \
 		--jobs $(JOBS) --fqbn $(BOARD_FQBN) $(PROJECT_DIR) 

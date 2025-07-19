@@ -24,11 +24,17 @@ void on_wifi_event(WiFiEvent_t event) {
       udp.begin(WIFI_DEFAULT_UDP_PORT);
       connected = true;
       break;
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+      Serial.println("WiFi connected, waiting IP...");
+      connected = true;
+      break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
       Serial.println("WiFi lost connection");
       connected = false;
       break;
-    default: break;
+    default: 
+      Serial.println("WiFi unknown event");
+      break;
   }
 }
 
@@ -84,8 +90,11 @@ void connect_wifi(const char *ssid, const char *password)
 
 void conn_loop() {
     int packetSize = udp.parsePacket();
-    Serial.print(" Received packet from : "); Serial.println(udp.remoteIP());
-    Serial.print(" Size : "); Serial.println(packetSize);
+    Serial.print("Received packet from: "); 
+    Serial.println(udp.remoteIP());
+    Serial.print("Size: "); 
+    Serial.println(packetSize);
+
     if (packetSize) {
         int len = udp.read(packetBuffer, 255);
         if (len > 0) packetBuffer[len - 1] = 0;
@@ -95,6 +104,7 @@ void conn_loop() {
 
 void disconnect_wifi()
 {
+    connected = false;
 }
 
 void is_network_present()
@@ -107,4 +117,5 @@ void connect()
 
 void disconnect()
 {
+    connected = false;
 }

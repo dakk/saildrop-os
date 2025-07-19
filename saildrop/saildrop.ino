@@ -14,7 +14,6 @@
 #include "screens/tackscreen.h"
 #include "screens/timerscreen.h"
 
-
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[SCREEN_WIDTH * SCREEN_HEIGHT / 10];
 

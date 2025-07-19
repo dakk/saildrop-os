@@ -8,7 +8,7 @@
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 240
 
-#define SHOWCASE 0
+#define SHOWCASE
 #define HOME_DEBUG
 
 #ifdef HOME_DEBUG
