@@ -148,12 +148,12 @@ void on_loading_completed()
 void setup()
 {
     Serial.begin(115200);
+    Serial.println("SaildropOS is booting.");
 
-    String LVGL_Arduino = "Hello Arduino! ";
+    String LVGL_Arduino = "LVGL: ";
     LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
 
     Serial.println(LVGL_Arduino);
-    Serial.println("I am LVGL_Arduino");
 
     lv_init();
 #if LV_USE_LOG != 0
@@ -169,6 +169,8 @@ void setup()
     // uint16_t calData[5] = { 275, 3620, 264, 3532, 1 };
     // tft.setTouch( calData );
     touch.begin();
+
+    Serial.println("Touch and TFT initialized");
 
     lv_disp_draw_buf_init(&draw_buf, buf, NULL, SCREEN_WIDTH * SCREEN_HEIGHT / 10);
 
@@ -190,6 +192,7 @@ void setup()
     lv_indev_drv_register(&indev_drv);
 
     //////////////// Create screens
+    Serial.println("LVGL initialized.\nCreating screens...");
     add_screen(new WindScreen());
     add_screen(new SpeedScreen());
     add_screen(new CompassScreen());
