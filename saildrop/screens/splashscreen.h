@@ -48,7 +48,6 @@ class SplashScreen : public Screen {
         }
 
         void load() {
-            list_networks();
             on_complete();
         }
 };

@@ -11,7 +11,7 @@ public:
     SpeedScreen() : Screen()
     {
         SpeedGauge *speed_gauge = new SpeedGauge(scr, SCREEN_WIDTH, SCREEN_HEIGHT);
-        speed_gauge->showcase();
+        // speed_gauge->showcase();
     }
 };
 

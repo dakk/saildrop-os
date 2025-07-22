@@ -2,6 +2,7 @@
 #define SPEEDGAUGE_H
 
 #include <lvgl.h>
+#include "../data.h"
 
 class SpeedGauge
 {
@@ -19,6 +20,10 @@ public:
 
 
 
+void speed_gauge_tick_cb(lv_timer_t *timer)
+{
+    ((SpeedGauge *)timer->user_data)->set_speed(get_data()->sog);
+}
 
 static void _sg_set_speed(void *sg, int32_t speed)
 {
@@ -85,6 +90,8 @@ SpeedGauge::SpeedGauge(lv_obj_t *parent, int width, int height)
 
     lv_obj_set_size(speed_arc, SCREEN_WIDTH, SCREEN_HEIGHT);
     lv_obj_center(speed_arc);
+
+    lv_timer_t *timer = lv_timer_create(speed_gauge_tick_cb, 100, this);
 }
 
 void SpeedGauge::set_speed(int32_t speed)

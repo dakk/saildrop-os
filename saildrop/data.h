@@ -13,4 +13,6 @@ struct nmea_data {
     uint32_t awa;
 };
 
+nmea_data *get_data();
+
 #endif
