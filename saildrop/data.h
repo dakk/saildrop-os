@@ -15,4 +15,8 @@ struct nmea_data {
 
 nmea_data *get_data();
 
+// TODO: use a singleton class instead?
+// TODO: add setters
+// TODO: add an handler list for new data (or stick with timers?)
+
 #endif

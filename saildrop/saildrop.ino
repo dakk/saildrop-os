@@ -6,16 +6,16 @@
 #include "conf.h"
 
 #include "screens/screen.h"
-#include "screens/compassscreen.h"
-#include "screens/speedscreen.h"
-#include "screens/windscreen.h"
+// #include "screens/compassscreen.h"
+// #include "screens/speedscreen.h"
+// #include "screens/windscreen.h"
 #include "screens/splashscreen.h"
-#include "screens/valuesscreen.h"
-#include "screens/tackscreen.h"
-#include "screens/timerscreen.h"
+// #include "screens/valuesscreen.h"
+// #include "screens/tackscreen.h"
+// #include "screens/timerscreen.h"
 
-static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[SCREEN_WIDTH * SCREEN_HEIGHT / 10];
+#define DRAW_BUF_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT  / 10 * (LV_COLOR_DEPTH / 8))
+uint32_t draw_buf[DRAW_BUF_SIZE / 4];
 
 static Screen *screens[16];
 int current_screen = 0;
@@ -77,20 +77,6 @@ void my_print(const char *buf)
 }
 #endif
 
-/* Display flushing */
-void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
-{
-    uint32_t w = (area->x2 - area->x1 + 1);
-    uint32_t h = (area->y2 - area->y1 + 1);
-
-    tft.startWrite();
-    tft.setAddrWindow(area->x1, area->y1, w, h);
-    tft.pushColors((uint16_t *)&color_p->full, w * h, true);
-    tft.endWrite();
-
-    lv_disp_flush_ready(disp_drv);
-}
-
 
 /* Seconds timer */
 void on_tick(void *arg)
@@ -100,7 +86,7 @@ void on_tick(void *arg)
 }
 
 /*Read the touchpad*/
-void my_touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
+void my_touchpad_read( lv_indev_t * indev, lv_indev_data_t * data )
 {
     // uint16_t touchX, touchY;
 
@@ -177,33 +163,25 @@ void setup()
 
     Serial.println("Touch and TFT initialized");
 
-    lv_disp_draw_buf_init(&draw_buf, buf, NULL, SCREEN_WIDTH * SCREEN_HEIGHT / 10);
-
-    /*Initialize the display*/
-    static lv_disp_drv_t disp_drv;
-    lv_disp_drv_init(&disp_drv);
-    /*Change the following line to your display resolution*/
-    disp_drv.hor_res = SCREEN_WIDTH;
-    disp_drv.ver_res = SCREEN_HEIGHT;
-    disp_drv.flush_cb = my_disp_flush;
-    disp_drv.draw_buf = &draw_buf;
-    lv_disp_drv_register(&disp_drv);
+    lv_display_t * disp;
+    /*TFT_eSPI can be enabled lv_conf.h to initialize the display in a simple way*/
+    disp = lv_tft_espi_create(SCREEN_WIDTH, SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
+    lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_0);
 
     /*Initialize the (dummy) input device driver*/
-    static lv_indev_drv_t indev_drv;
-    lv_indev_drv_init(&indev_drv);
-    indev_drv.type = LV_INDEV_TYPE_POINTER;
-    indev_drv.read_cb = my_touchpad_read;
-    lv_indev_drv_register(&indev_drv);
+    lv_indev_t *indev = lv_indev_create();
+    lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); /*Touchpad should have POINTER type*/
+    lv_indev_set_read_cb(indev, my_touchpad_read);
+
 
     //////////////// Create screens
     Serial.println("LVGL initialized.\nCreating screens...");
-    add_screen(new WindScreen());
-    add_screen(new SpeedScreen());
-    add_screen(new CompassScreen());
-    add_screen(new ValuesScreen());
-    add_screen(new TackScreen());
-    add_screen(new TimerScreen());
+    // add_screen(new WindScreen());
+    // add_screen(new SpeedScreen());
+    // add_screen(new CompassScreen());
+    // add_screen(new ValuesScreen());
+    // add_screen(new TackScreen());
+    // add_screen(new TimerScreen());
     current_screen = 5;
 
     splash = new SplashScreen(&on_loading_completed);
