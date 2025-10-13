@@ -8,10 +8,10 @@
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 240
 
-#define SHOWCASE
-#define HOME_DEBUG
+// #define SHOWCASE
+// #define HOME_DEBUG
 
-#define AP_MODE
+// #define AP_MODE
 #define AP_SSID "SAILDROP_AP"
 #define AP_PASS "12345678"
 
@@ -22,7 +22,7 @@
     #define WIFI_DEFAULT_TCP_PORT 2000
     #define WIFI_DEFAULT_UDP_PORT 2001
 #else
-    #define WIFI_DEFAULT_SSID "NMEA3WIFI"
+    #define WIFI_DEFAULT_SSID "DIVERSA_SAILING"
     #define WIFI_DEFAULT_PASSWORD "12345678"
     #define WIFI_DEFAULT_IP "192.168.4.1"
     #define WIFI_DEFAULT_TCP_PORT 2000

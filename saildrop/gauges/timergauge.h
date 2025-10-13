@@ -30,7 +30,7 @@ public:
 
 void timer_gauge_tick_cb(lv_timer_t *timer)
 {
-    ((TimerGauge *)timer->user_data)->tick_handler();
+    ((TimerGauge *) lv_timer_get_user_data(timer))->tick_handler();
 }
 
 TimerGauge::~TimerGauge()

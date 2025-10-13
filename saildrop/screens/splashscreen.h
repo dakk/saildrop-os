@@ -14,40 +14,31 @@ class SplashScreen : public Screen {
             on_complete = on_complete_f;
             scr = lv_obj_create(NULL);
             lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
-            // lv_obj_set_style_bg_color(scr, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
-            // lv_obj_set_style_bg_opa(scr, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_color(scr, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-            // lv_obj_t* splash_bg = lv_img_create(scr);
-            // lv_img_set_src(splash_bg, &ui_img_bg1_png);
-            // lv_obj_set_width(splash_bg, LV_SIZE_CONTENT);
-            // lv_obj_set_height(splash_bg, LV_SIZE_CONTENT);
-            // lv_obj_set_align(splash_bg, LV_ALIGN_CENTER);
-            // lv_obj_add_flag(splash_bg, LV_OBJ_FLAG_ADV_HITTEST);
-            // lv_obj_clear_flag(splash_bg, LV_OBJ_FLAG_SCROLLABLE);
+
+            lv_obj_t * spinner = lv_spinner_create(scr);
+            lv_obj_center(spinner);
+            lv_spinner_set_anim_params(spinner, 1000, 60);
+
+            // lv_obj_set_style_arc_width(spinner, 20, LV_PART_MAIN );
+            // lv_obj_set_style_arc_width(spinner, 20, LV_PART_INDICATOR);
+            //lv_obj_set_style_arc_color(spinner, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
+            lv_obj_set_style_arc_color(spinner, lv_palette_darken(LV_PALETTE_ORANGE, 3), LV_PART_INDICATOR);
+            lv_obj_set_size(spinner, SCREEN_WIDTH, SCREEN_HEIGHT);
+            lv_obj_center(spinner);
+
 
             lv_obj_t* splash_label = lv_label_create(scr);
             lv_obj_set_width(splash_label, LV_SIZE_CONTENT);
             lv_obj_set_height(splash_label, LV_SIZE_CONTENT); 
-            // lv_obj_set_x(splash_label, 2);
-            // lv_obj_set_y(splash_label, SCREEN_HEIGHT/2);
             lv_obj_set_align(splash_label, LV_ALIGN_CENTER);
             lv_label_set_text(splash_label, "SAILDROP");
-            // lv_obj_set_style_text_color(splash_label, lv_color_hex(0x0), LV_PART_MAIN | LV_STATE_DEFAULT);
-            // lv_obj_set_style_text_opa(splash_label, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-            // lv_obj_set_style_text_font(splash_label, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-            lv_obj_t * spinner = lv_spinner_create(scr, 1000, 60);
-
-            lv_obj_set_style_arc_width(spinner, 20, LV_PART_MAIN );
-            lv_obj_set_style_arc_width(spinner, 20, LV_PART_INDICATOR);
-            // lv_obj_set_style_arc_color(spinner, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
-            lv_obj_set_style_arc_color(spinner, lv_palette_darken(LV_PALETTE_ORANGE, 3), LV_PART_INDICATOR);
-            
-            lv_obj_set_size(spinner, SCREEN_WIDTH, SCREEN_HEIGHT);
-            lv_obj_center(spinner);
+            lv_obj_set_style_text_color(splash_label, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
         }
 
         void load() {
+            delay(2000);
             on_complete();
         }
 };

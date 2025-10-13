@@ -4,6 +4,7 @@
 #include <lvgl.h>
 #include <cmath>
 
+// https://docs.lvgl.io/9.3/details/widgets/scale.html#a-round-scale-style-simulating-a-compass
 
 class Compass
 {

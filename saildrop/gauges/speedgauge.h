@@ -7,11 +7,10 @@
 class SpeedGauge
 {
 private:
-public:
-    lv_obj_t *meter;
-    lv_meter_indicator_t *indic;
     lv_obj_t *speed_label;
-    lv_obj_t * speed_arc;
+    lv_obj_t *scale_line;
+    lv_obj_t *needle_line;
+public:
 
     SpeedGauge(lv_obj_t *parent, int width, int height);
     void set_speed(int32_t speed);
@@ -22,7 +21,8 @@ public:
 
 void speed_gauge_tick_cb(lv_timer_t *timer)
 {
-    ((SpeedGauge *)timer->user_data)->set_speed(get_data()->sog);
+    SpeedGauge *gauge = (SpeedGauge *) lv_timer_get_user_data(timer);
+    gauge->set_speed(get_data()->sog);
 }
 
 static void _sg_set_speed(void *sg, int32_t speed)
@@ -32,83 +32,68 @@ static void _sg_set_speed(void *sg, int32_t speed)
 
 SpeedGauge::SpeedGauge(lv_obj_t *parent, int width, int height)
 {
-    meter = lv_meter_create(parent);
-    lv_obj_center(meter);
-    lv_obj_set_size(meter, width, height);
+    // Create a bg object (TODO: create an helper for everyone)
+    lv_obj_t * bg = lv_obj_create(parent);
+    lv_obj_set_size(bg, width, height);
+    lv_obj_center(bg);
+    lv_obj_set_style_radius(bg, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(bg, lv_palette_darken(LV_PALETTE_GREY, 4), 0);
+    lv_obj_set_style_bg_opa(bg, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(bg, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_pad_all(bg, 0, LV_PART_MAIN);
 
-    /*Add a scale first*/
-    lv_meter_scale_t *scale = lv_meter_add_scale(meter);
-    lv_meter_set_scale_ticks(meter, scale, 41, 2, 10, lv_palette_main(LV_PALETTE_GREY));
-    lv_meter_set_scale_major_ticks(meter, scale, 8, 4, 15, lv_color_black(), 10);
-    lv_meter_set_scale_range(meter, scale, 0, 15, 270, 0);
 
-    /*Add a blue arc to the start*/
-    indic = lv_meter_add_arc(meter, scale, 3, lv_palette_main(LV_PALETTE_BLUE), 0);
-    lv_meter_set_indicator_start_value(meter, indic, 0);
-    lv_meter_set_indicator_end_value(meter, indic, 3);
+    scale_line = lv_scale_create(bg);
 
-    /*Make the tick lines blue at the start of the scale*/
-    indic = lv_meter_add_scale_lines(meter, scale, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_BLUE),
-                                     false, 0);
-    lv_meter_set_indicator_start_value(meter, indic, 0);
-    lv_meter_set_indicator_end_value(meter, indic, 3);
+    lv_obj_set_size(scale_line, width, height);
+    lv_scale_set_mode(scale_line, LV_SCALE_MODE_ROUND_INNER);
+    // lv_obj_set_style_bg_opa(scale_line, LV_OPA_COVER, 0);
+    // lv_obj_set_style_bg_color(scale_line, lv_palette_lighten(LV_PALETTE_RED, 5), 0);
+    lv_obj_set_style_radius(scale_line, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_clip_corner(scale_line, true, 0);
+    lv_obj_align(scale_line, LV_ALIGN_LEFT_MID, LV_PCT(2), 0);
 
-    /*Add a red arc to the end*/
-    indic = lv_meter_add_arc(meter, scale, 3, lv_palette_main(LV_PALETTE_RED), 0);
-    lv_meter_set_indicator_start_value(meter, indic, 10);
-    lv_meter_set_indicator_end_value(meter, indic, 15);
+    lv_scale_set_label_show(scale_line, true);
 
-    /*Make the tick lines red at the end of the scale*/
-    indic = lv_meter_add_scale_lines(meter, scale, lv_palette_main(LV_PALETTE_RED), lv_palette_main(LV_PALETTE_RED), false,
-                                     0);
-    lv_meter_set_indicator_start_value(meter, indic, 10);
-    lv_meter_set_indicator_end_value(meter, indic, 15);
+    lv_scale_set_total_tick_count(scale_line, 31);
+    lv_scale_set_major_tick_every(scale_line, 5);
 
-    /*Add a needle line indicator*/
-    indic = lv_meter_add_needle_line(meter, scale, 4, lv_palette_main(LV_PALETTE_GREY), -10);
+    lv_obj_set_style_length(scale_line, 5, LV_PART_ITEMS);
+    lv_obj_set_style_length(scale_line, 10, LV_PART_INDICATOR);
+    lv_scale_set_range(scale_line, 0, 20);
 
-    // Add speed label
-    speed_label = lv_label_create(meter);
+    lv_scale_set_angle_range(scale_line, 270);
+    lv_scale_set_rotation(scale_line, 135);
+
+    // Tick style
+    static lv_style_t style_ticks;
+    lv_style_init(&style_ticks);
+    lv_style_set_line_color(&style_ticks, lv_palette_darken(LV_PALETTE_GREY, 1));
+    lv_style_set_line_width(&style_ticks, 2);
+    lv_style_set_width(&style_ticks, 10);
+    lv_obj_add_style(scale_line, &style_ticks, LV_PART_INDICATOR);
+
+    // Needle
+    needle_line = lv_line_create(scale_line);
+    lv_obj_set_style_line_width(needle_line, 6, LV_PART_MAIN);
+    lv_obj_set_style_line_rounded(needle_line, true, LV_PART_MAIN);
+    lv_obj_set_style_line_color(needle_line, lv_palette_darken(LV_PALETTE_GREY, 1), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // Speed label
+    speed_label = lv_label_create(scale_line);
     lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, 40);
+    lv_obj_set_style_text_color(speed_label, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_20, 0);
     lv_label_set_text(speed_label, "0.0 kts");
-
-
-    // Speed arc
-    speed_arc = lv_arc_create(parent);
-
-    lv_obj_set_style_arc_width(speed_arc, 10, LV_PART_MAIN );
-    lv_obj_set_style_arc_width(speed_arc, 10, LV_PART_INDICATOR);
-    // lv_obj_set_style_arc_color(spinner, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
-    lv_obj_set_style_arc_color(speed_arc, lv_palette_darken(LV_PALETTE_BLUE, 3), LV_PART_INDICATOR);
-
-    lv_obj_remove_style(speed_arc, NULL, LV_PART_KNOB);   /*Be sure the knob is not displayed*/
-    lv_obj_clear_flag(speed_arc, LV_OBJ_FLAG_CLICKABLE);  /*To not allow adjusting by click*/
-    
-    lv_arc_set_rotation(speed_arc, 0);
-    lv_arc_set_bg_angles(speed_arc, 0, 270);
-    lv_arc_set_start_angle(speed_arc, 0);
-
-    lv_obj_set_size(speed_arc, SCREEN_WIDTH, SCREEN_HEIGHT);
-    lv_obj_center(speed_arc);
 
     lv_timer_t *timer = lv_timer_create(speed_gauge_tick_cb, 100, this);
 }
 
 void SpeedGauge::set_speed(int32_t speed)
 {
-    lv_arc_set_end_angle(speed_arc, 270 * speed / 150);
-
-    if (speed < 30) 
-        lv_obj_set_style_arc_color(speed_arc, lv_palette_darken(LV_PALETTE_BLUE, 3), LV_PART_INDICATOR);
-    else if (speed > 100) 
-        lv_obj_set_style_arc_color(speed_arc, lv_palette_darken(LV_PALETTE_RED, 3), LV_PART_INDICATOR);
-    else 
-        lv_obj_set_style_arc_color(speed_arc, lv_palette_darken(LV_PALETTE_GREEN, 3), LV_PART_INDICATOR);
-
-
-    lv_meter_set_indicator_value(meter, indic, speed / 10);
-
     char buf[20];
+    lv_scale_set_line_needle_value(scale_line, needle_line, 60, speed / 10.0);
+
     lv_snprintf(buf, sizeof(buf), "%d.%d kts", speed / 10, speed % 10);
     lv_label_set_text(speed_label, buf);
 }
@@ -119,7 +104,7 @@ void SpeedGauge::showcase()
     lv_anim_init(&a);
     lv_anim_set_exec_cb(&a, _sg_set_speed);
     lv_anim_set_var(&a, this);
-    lv_anim_set_values(&a, 0, 150);
+    lv_anim_set_values(&a, 0, 200);
     lv_anim_set_time(&a, 2000);
     lv_anim_set_repeat_delay(&a, 100);
     lv_anim_set_playback_time(&a, 500);
