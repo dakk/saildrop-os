@@ -19,10 +19,11 @@ public:
 
 
 
-// void speed_gauge_tick_cb(lv_timer_t *timer)
-// {
-//     ((SpeedGauge *)timer->user_data)->set_speed(get_data()->sog);
-// }
+void speed_gauge_tick_cb(lv_timer_t *timer)
+{
+    SpeedGauge *gauge = (SpeedGauge *) lv_timer_get_user_data(timer);
+    gauge->set_speed(get_data()->sog);
+}
 
 static void _sg_set_speed(void *sg, int32_t speed)
 {
@@ -85,7 +86,7 @@ SpeedGauge::SpeedGauge(lv_obj_t *parent, int width, int height)
     lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_20, 0);
     lv_label_set_text(speed_label, "0.0 kts");
 
-    // lv_timer_t *timer = lv_timer_create(speed_gauge_tick_cb, 100, this);
+    lv_timer_t *timer = lv_timer_create(speed_gauge_tick_cb, 100, this);
 }
 
 void SpeedGauge::set_speed(int32_t speed)
