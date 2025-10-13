@@ -10,6 +10,7 @@ void disconnect_wifi();
 void is_network_present();
 void connect();
 void disconnect();
+void conn_loop();
 
 void on_wifi_event(WiFiEvent_t event);
 
