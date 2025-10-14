@@ -10,7 +10,7 @@
 #include "screens/speedscreen.h"
 // #include "screens/windscreen.h"
 #include "screens/splashscreen.h"
-// #include "screens/valuesscreen.h"
+#include "screens/valuesscreen.h"
 // #include "screens/tackscreen.h"
 // #include "screens/timerscreen.h"
 
@@ -179,7 +179,7 @@ void setup()
     add_screen(new SpeedScreen());
     // add_screen(new WindScreen());
     // add_screen(new CompassScreen());
-    // add_screen(new ValuesScreen());
+    add_screen(new ValuesScreen());
     // add_screen(new TackScreen());
     // add_screen(new TimerScreen());
     current_screen = 0;
