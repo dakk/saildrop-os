@@ -11,7 +11,9 @@ public:
     CompassScreen() : Screen()
     {
         Compass *compass = new Compass(scr, SCREEN_WIDTH, SCREEN_HEIGHT);
-        compass->showcase();
+        #ifdef SHOWCASE 
+            compass->showcase();
+        #endif
     }
 };
 

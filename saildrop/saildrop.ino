@@ -6,7 +6,7 @@
 #include "conf.h"
 
 #include "screens/screen.h"
-// #include "screens/compassscreen.h"
+#include "screens/compassscreen.h"
 #include "screens/speedscreen.h"
 // #include "screens/windscreen.h"
 #include "screens/splashscreen.h"
@@ -178,7 +178,7 @@ void setup()
     Serial.println("LVGL initialized.\nCreating screens...");
     add_screen(new SpeedScreen());
     // add_screen(new WindScreen());
-    // add_screen(new CompassScreen());
+    add_screen(new CompassScreen());
     add_screen(new ValuesScreen());
     // add_screen(new TackScreen());
     // add_screen(new TimerScreen());
