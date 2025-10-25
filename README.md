@@ -4,6 +4,7 @@ Saildrop OS is an ESP32 operating system for sailing gauges and tools.
 
 This is a work in progress project, and currently I'm targeting the Waveshare Esp32 with 1.28 inch touch LCD, connected to an NMEA3WIFI multiplexer using wifi.
 
+[![Watch the Short](https://img.youtube.com/vi/CF-8LODOrT0/0.jpg)](https://www.youtube.com/shorts/CF-8LODOrT0)
 
 ## Customization
 
