@@ -1,5 +1,14 @@
 # Saildrop-os
 
+Saildrop OS is an ESP32 operating system for sailing gauges and tools.
+
+This is a work in progress project, and currently I'm targeting the Waveshare Esp32 with 1.28 inch touch LCD, connected to an NMEA3WIFI multiplexer using wifi.
+
+
+## Customization
+
+The OS is customizable by editing `saildrop/conf.h`.
+
 
 ## Building
 
@@ -14,3 +23,8 @@ It provides a package with fixed version libraries, use their tft.
 
 https://github.com/lvgl/lvgl/blob/v8.3.11/examples
 https://docs.lvgl.io/8.4/widgets/extra/index.html
+
+
+## License
+
+This software is licensed with [Apache License 2.0](LICENSE).
