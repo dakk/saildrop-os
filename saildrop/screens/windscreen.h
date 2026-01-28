@@ -23,13 +23,23 @@
 class WindScreen : public Screen
 {
 private:
+    WindGauge *wind_gauge;
+
 public:
     WindScreen() : Screen()
     {
-        WindGauge *wind_gauge = new WindGauge(scr, SCREEN_WIDTH, SCREEN_HEIGHT);
+        wind_gauge = new WindGauge(scr, SCREEN_WIDTH, SCREEN_HEIGHT);
         #ifdef SHOWCASE
             wind_gauge->showcase();
         #endif
+    }
+
+    void on_swipe_up() override {
+        wind_gauge->toggle_mode();
+    }
+
+    void on_swipe_down() override {
+        wind_gauge->toggle_mode();
     }
 };
 

@@ -31,13 +31,19 @@ private:
     lv_obj_t *type_label;
     lv_point_precise_t needle_points[2];
     int32_t current_angle = 0;
+    bool show_apparent = true;
 
     static const char* labels[];
 
     static void tick_cb(lv_timer_t *timer) {
         WindGauge *gauge = static_cast<WindGauge*>(lv_timer_get_user_data(timer));
-        gauge->set_direction(get_data()->awa);
-        gauge->set_speed(get_data()->aws);
+        if (gauge->show_apparent) {
+            gauge->set_direction(get_data()->awa);
+            gauge->set_speed(get_data()->aws);
+        } else {
+            gauge->set_direction(get_data()->twa);
+            gauge->set_speed(get_data()->tws);
+        }
     }
 
     static void anim_direction_cb(void *var, int32_t value) {
@@ -197,7 +203,12 @@ public:
     }
 
     void set_type(bool apparent) {
+        show_apparent = apparent;
         lv_label_set_text(type_label, apparent ? "AWA" : "TWA");
+    }
+
+    void toggle_mode() {
+        set_type(!show_apparent);
     }
 
     void showcase() {
