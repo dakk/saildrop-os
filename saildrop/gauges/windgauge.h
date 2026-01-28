@@ -73,37 +73,7 @@ public:
         // Background container
         bg = gauge_styles::create_gauge_bg(parent, width, height);
 
-        // Port (green) close-hauled arc - top left (20° to 60° from bow)
-        // LVGL: 0°=right, 270°=top. Port is counter-clockwise from top: 270°-20°=250° to 270°-60°=210°
-        lv_obj_t *port_arc = lv_arc_create(bg);
-        lv_obj_set_size(port_arc, width - 20, height - 20);
-        lv_obj_center(port_arc);
-        lv_arc_set_rotation(port_arc, 0);
-        lv_arc_set_bg_angles(port_arc, 210, 250);
-        lv_arc_set_value(port_arc, 0);
-        lv_obj_remove_style(port_arc, nullptr, LV_PART_KNOB);
-        lv_obj_remove_style(port_arc, nullptr, LV_PART_INDICATOR);
-        lv_obj_remove_flag(port_arc, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_style_arc_width(port_arc, 12, LV_PART_MAIN);
-        lv_obj_set_style_arc_color(port_arc, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
-        lv_obj_set_style_arc_rounded(port_arc, false, LV_PART_MAIN);
-
-        // Starboard (red) close-hauled arc - top right (20° to 60° from bow)
-        // LVGL: 0°=right, 270°=top. Starboard is clockwise from top: 270°+20°=290° to 270°+60°=330°
-        lv_obj_t *stbd_arc = lv_arc_create(bg);
-        lv_obj_set_size(stbd_arc, width - 20, height - 20);
-        lv_obj_center(stbd_arc);
-        lv_arc_set_rotation(stbd_arc, 0);
-        lv_arc_set_bg_angles(stbd_arc, 290, 330);
-        lv_arc_set_value(stbd_arc, 0);
-        lv_obj_remove_style(stbd_arc, nullptr, LV_PART_KNOB);
-        lv_obj_remove_style(stbd_arc, nullptr, LV_PART_INDICATOR);
-        lv_obj_remove_flag(stbd_arc, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_style_arc_width(stbd_arc, 12, LV_PART_MAIN);
-        lv_obj_set_style_arc_color(stbd_arc, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN);
-        lv_obj_set_style_arc_rounded(stbd_arc, false, LV_PART_MAIN);
-
-        // Scale
+        // Scale (created first so arcs render on top)
         scale = lv_scale_create(bg);
         lv_obj_set_size(scale, width - 5, height - 5);
         lv_scale_set_mode(scale, LV_SCALE_MODE_ROUND_INNER);
@@ -126,6 +96,36 @@ public:
         lv_obj_set_style_line_width(scale, 3, LV_PART_INDICATOR);
         lv_obj_set_style_text_color(scale, lv_color_white(), LV_PART_INDICATOR);
         lv_obj_set_style_text_font(scale, &lv_font_montserrat_14, LV_PART_INDICATOR);
+
+        // Port (green) close-hauled arc - top left (20° to 60° from bow)
+        // LVGL: 0°=right, 270°=top. Port is counter-clockwise from top: 270°-20°=250° to 270°-60°=210°
+        lv_obj_t *port_arc = lv_arc_create(bg);
+        lv_obj_set_size(port_arc, width + 5, height + 5);
+        lv_obj_center(port_arc);
+        lv_arc_set_rotation(port_arc, 0);
+        lv_arc_set_bg_angles(port_arc, 210, 250);
+        lv_arc_set_value(port_arc, 0);
+        lv_obj_remove_style(port_arc, nullptr, LV_PART_KNOB);
+        lv_obj_remove_style(port_arc, nullptr, LV_PART_INDICATOR);
+        lv_obj_remove_flag(port_arc, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_arc_width(port_arc, 12, LV_PART_MAIN);
+        lv_obj_set_style_arc_color(port_arc, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
+        lv_obj_set_style_arc_rounded(port_arc, false, LV_PART_MAIN);
+
+        // Starboard (red) close-hauled arc - top right (20° to 60° from bow)
+        // LVGL: 0°=right, 270°=top. Starboard is clockwise from top: 270°+20°=290° to 270°+60°=330°
+        lv_obj_t *stbd_arc = lv_arc_create(bg);
+        lv_obj_set_size(stbd_arc, width + 5, height + 5);
+        lv_obj_center(stbd_arc);
+        lv_arc_set_rotation(stbd_arc, 0);
+        lv_arc_set_bg_angles(stbd_arc, 290, 330);
+        lv_arc_set_value(stbd_arc, 0);
+        lv_obj_remove_style(stbd_arc, nullptr, LV_PART_KNOB);
+        lv_obj_remove_style(stbd_arc, nullptr, LV_PART_INDICATOR);
+        lv_obj_remove_flag(stbd_arc, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_arc_width(stbd_arc, 12, LV_PART_MAIN);
+        lv_obj_set_style_arc_color(stbd_arc, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN);
+        lv_obj_set_style_arc_rounded(stbd_arc, false, LV_PART_MAIN);
 
         // Boat bow marker at top
         lv_obj_t *bow_marker = lv_label_create(bg);
