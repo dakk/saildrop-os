@@ -21,9 +21,9 @@ BUILD_PROPERTY = --build-property build.flash_size=16MB \
 all: compile upload monitor
 
 install-prereq:
-	cp -r Esp32-s3-touch-lcd-lib/* ~/Arduino/libraries
-	cp lv_conf.h ~/Arduino/libraries/lvgl/
-	cp lv_conf.h ~/Arduino/libraries/lvgl/src/
+	wget https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.28/ESP32-S3-Touch-LCD-1.28-Demo.zip
+	unzip ESP32-S3-Touch-LCD-1.28-Demo.zip
+	cp -r ESP32-S3-Touch-LCD-1.28-Demo/Arduino/libraries/TFT* ~/Arduino/libraries
 	arduino-cli core install esp32:esp32@2.0.12
 
 compile:
