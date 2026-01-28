@@ -115,14 +115,16 @@ void my_touchpad_read( lv_indev_t * indev, lv_indev_data_t * data )
     else
     {
         data->state = LV_INDEV_STATE_PR;
-        Serial.println(touch.gesture());
+        Serial.printf("Gesture: %s, ID: %d, status: %d, tick: %lu, last: %lu\n",
+                      touch.gesture(), touch.data.gestureID, status, tick, last_handled_gesture_tick);
 
-        if (status != RUNNING || (tick - last_handled_gesture_tick) < 100)
+        if (status != RUNNING || (tick - last_handled_gesture_tick) < 50)
             return;
 
+        Serial.printf("Handling gesture ID: %d\n", touch.data.gestureID);
         if (touch.data.gestureID == SWIPE_LEFT)
         {
-            current_screen = abs((current_screen - 1) % num_screens);
+            current_screen = (current_screen + num_screens - 1) % num_screens;
             lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, 100, 0, false);
             last_handled_gesture_tick = tick;
         }
