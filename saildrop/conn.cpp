@@ -20,6 +20,7 @@
 #include "conf.h"
 #include "data.h"
 #include "settings.h"
+#include "ais.h"
 
 String networks[32];
 uint8_t n_networks = 0;
@@ -35,6 +36,40 @@ uint8_t packetBuffer[255];
 
 char nmeaBuffer[100];
 MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
+
+// AIS sentence buffer (separate from NMEA since AIS uses '!' prefix)
+static char aisBuffer[100];
+static uint8_t aisBufferIdx = 0;
+
+// Helper to update own position from MicroNMEA
+void update_own_position() {
+    if (nmea.isValid()) {
+        get_data()->lat = nmea.getLatitude();   // Returns microdegrees
+        get_data()->lon = nmea.getLongitude();  // Returns microdegrees
+        get_data()->position_valid = true;
+    }
+}
+
+// Process buffer for AIS sentences (start with '!')
+void process_ais_char(char c) {
+    if (c == '!') {
+        // Start of AIS sentence
+        aisBufferIdx = 0;
+    }
+
+    if (aisBufferIdx < sizeof(aisBuffer) - 1) {
+        aisBuffer[aisBufferIdx++] = c;
+
+        if (c == '\n' || c == '\r') {
+            aisBuffer[aisBufferIdx] = '\0';
+            if (strncmp(aisBuffer, "!AIVDM", 6) == 0 ||
+                strncmp(aisBuffer, "!AIVDO", 6) == 0) {
+                get_ais_manager()->process_sentence(aisBuffer);
+            }
+            aisBufferIdx = 0;
+        }
+    }
+}
 
 // Helper to parse custom NMEA sentences not handled by MicroNMEA
 void parse_custom_nmea(const char* sentence) {
@@ -257,15 +292,24 @@ void conn_loop_server() {
                              udp.remoteIP().toString().c_str(),
                              udp.remotePort(), packetBuffer);
 
-                // Process NMEA data
+                // Process NMEA and AIS data
                 for (int i = 0; i < len; i++) {
+                    process_ais_char(packetBuffer[i]);  // Check for AIS
                     if (nmea.process(packetBuffer[i])) {
                         parse_custom_nmea(nmea.getSentence());
+                        update_own_position();  // Update lat/lon
                     }
                 }
 
                 get_data()->sog = nmea.getSpeed() / 100.;
                 get_data()->hdg = nmea.getCourse() / 1000.;
+
+                // Periodic AIS cleanup
+                static uint32_t lastAisCleanup = 0;
+                if (millis() - lastAisCleanup > 60000) {
+                    get_ais_manager()->cleanup_stale();
+                    lastAisCleanup = millis();
+                }
             }
         }
     } else {
@@ -294,10 +338,12 @@ void conn_loop_server() {
                 packetBuffer[len] = '\0';
                 Serial.printf("Received: %s\n", packetBuffer);
 
-                // Process NMEA data
+                // Process NMEA and AIS data
                 for (int i = 0; i < len; i++) {
+                    process_ais_char(packetBuffer[i]);  // Check for AIS
                     if (nmea.process(packetBuffer[i])) {
                         parse_custom_nmea(nmea.getSentence());
+                        update_own_position();  // Update lat/lon
                     }
                 }
 
@@ -335,9 +381,12 @@ void conn_loop_client() {
                 packetBuffer[len] = '\0';
                 Serial.printf("UDP Received: %s\n", packetBuffer);
 
+                // Process NMEA and AIS data
                 for (int i = 0; i < len; i++) {
+                    process_ais_char(packetBuffer[i]);  // Check for AIS
                     if (nmea.process(packetBuffer[i])) {
                         parse_custom_nmea(nmea.getSentence());
+                        update_own_position();  // Update lat/lon
                     }
                 }
 
@@ -367,9 +416,12 @@ void conn_loop_client() {
                 packetBuffer[len] = '\0';  // null-terminate properly
                 Serial.printf("Received: %s\n", packetBuffer);
 
+                // Process NMEA and AIS data
                 for (int i = 0; i < len; i++) {
+                    process_ais_char(packetBuffer[i]);  // Check for AIS
                     if (nmea.process(packetBuffer[i])) {
                         parse_custom_nmea(nmea.getSentence());
+                        update_own_position();  // Update lat/lon
                     }
                 }
 

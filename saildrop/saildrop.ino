@@ -29,6 +29,7 @@
 #include "screens/splashscreen.h"
 #include "screens/valuesscreen.h"
 #include "screens/portalscreen.h"
+#include "screens/aisscreen.h"
 // #include "screens/tackscreen.h"
 // #include "screens/timerscreen.h"
 
@@ -306,6 +307,7 @@ void setup()
     add_screen(new WindScreen());
     add_screen(new CompassScreen());
     add_screen(new ValuesScreen());
+    add_screen(new AISScreen());
     // add_screen(new TackScreen());
     // add_screen(new TimerScreen());
     current_screen = 0;

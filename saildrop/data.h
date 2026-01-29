@@ -28,6 +28,11 @@ struct nmea_data {
     uint32_t awa;
 
     uint32_t depth;  // Depth in 0.1m units
+
+    // Own boat position for AIS display
+    int32_t lat;          // Latitude in microdegrees (-90,000,000 to +90,000,000)
+    int32_t lon;          // Longitude in microdegrees (-180,000,000 to +180,000,000)
+    bool position_valid;  // True when GPS fix is available
 };
 
 nmea_data *get_data();
