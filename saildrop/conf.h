@@ -33,6 +33,11 @@
 #define AP_SSID "SAILDROP_AP"
 #define AP_PASS "12345678"
 
+// WiFiManager portal configuration
+#define PORTAL_SSID "SAILDROP_SETUP"
+#define PORTAL_PASS "saildrop"
+#define PORTAL_TIMEOUT_SEC 180  // 3 minutes
+
 #ifdef HOME_DEBUG
     #define WIFI_DEFAULT_SSID "SD_NMEA"
     #define WIFI_DEFAULT_PASSWORD "saildropwashere!!!!"

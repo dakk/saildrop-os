@@ -19,6 +19,8 @@
 #include "CST816S.h"
 #include "conn.h"
 #include "conf.h"
+#include "settings.h"
+#include "wifiportal.h"
 
 #include "screens/screen.h"
 #include "screens/compassscreen.h"
@@ -26,6 +28,7 @@
 #include "screens/windscreen.h"
 #include "screens/splashscreen.h"
 #include "screens/valuesscreen.h"
+#include "screens/portalscreen.h"
 // #include "screens/tackscreen.h"
 // #include "screens/timerscreen.h"
 
@@ -36,6 +39,7 @@ static Screen *screens[16];
 int current_screen = 0;
 uint8_t num_screens = 0;
 Screen *splash;
+Screen *portalScreen;
 
 void add_screen(Screen *sc) {
     screens[num_screens] = sc;
@@ -50,12 +54,17 @@ TaskHandle_t core2_loop_task;
 enum SAILDROP_STATUS
 {
     BOOT,
+    PORTAL_MODE,
     LOADING_TRIGGERED,
     LOADING_COMPLETED,
     SETUP,
     SETUP_DONE,
     RUNNING
 };
+
+// Long press detection for factory reset
+#define BOOT_LONG_PRESS_MS 3000
+bool factoryResetRequested = false;
 
 SAILDROP_STATUS status = BOOT;
 uint32_t tick = 0;
@@ -66,16 +75,74 @@ void core2_loop(void *arg)
 {
     while (1)
     {
-        if (status == BOOT)
+        if (status == PORTAL_MODE)
+        {
+            // Run WiFiManager portal (blocking until configured or timeout)
+            Serial.println("Starting WiFi configuration portal...");
+            getPortal()->begin();
+            bool success = getPortal()->startPortal();
+
+            if (success) {
+                Serial.println("Portal configuration successful, restarting...");
+                delay(1000);
+                ESP.restart();  // Restart to apply new WiFi configuration cleanly
+            } else {
+                Serial.println("Portal timeout, retrying...");
+                delay(1000);
+            }
+        }
+        else if (status == BOOT)
         {
             status = LOADING_TRIGGERED;
             ((SplashScreen *)splash)->load();
-            // Inizialize the connection module
-            initialize_connections();
-            #ifndef AP_MODE
-                connect_wifi(WIFI_DEFAULT_SSID, WIFI_DEFAULT_PASSWORD);
-            #endif
-        } else {
+
+            SaildropSettings* s = getSettings()->get();
+
+            if (s->ap_mode) {
+                // AP Mode: Create own WiFi network and listen for connections
+                Serial.println("Starting in AP mode...");
+                WiFi.mode(WIFI_AP);
+                bool apStarted = WiFi.softAP(s->ap_ssid, s->ap_pass);
+
+                if (!apStarted) {
+                    Serial.println("Failed to start AP, going to portal");
+                    status = PORTAL_MODE;
+                    continue;
+                }
+
+                Serial.printf("AP started: %s\n", s->ap_ssid);
+                Serial.printf("AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+                Serial.printf("Listening on port: %d (%s)\n", s->listen_port,
+                             s->listen_protocol == PROTO_TCP ? "TCP" : "UDP");
+
+                // Initialize connection module for listening mode
+                initialize_connections_ap(s->listen_port, s->listen_protocol);
+            } else {
+                // Station Mode: Connect to existing WiFi network
+                Serial.printf("Connecting to WiFi: %s\n", s->wifi_ssid);
+                WiFi.mode(WIFI_STA);
+                WiFi.begin(s->wifi_ssid, s->wifi_pass);
+
+                // Wait for connection with timeout
+                int timeout = 150;  // 15 seconds (100ms * 150)
+                while (WiFi.status() != WL_CONNECTED && timeout > 0) {
+                    delay(100);
+                    timeout--;
+                }
+
+                if (WiFi.status() != WL_CONNECTED) {
+                    Serial.println("WiFi connection failed, starting portal");
+                    status = PORTAL_MODE;
+                    continue;
+                }
+
+                Serial.printf("WiFi connected: %s\n", WiFi.localIP().toString().c_str());
+
+                // Initialize connection module for client mode
+                initialize_connections();
+            }
+        }
+        else {
             conn_loop();
         }
 
@@ -153,6 +220,33 @@ void on_loading_completed()
     status = LOADING_COMPLETED;
 }
 
+// Detect long press at boot for factory reset
+bool detectBootLongPress() {
+    Serial.println("Hold touch for 3 seconds to factory reset...");
+    uint32_t start = millis();
+
+    while (millis() - start < BOOT_LONG_PRESS_MS) {
+        if (touch.available()) {
+            if (touch.data.gestureID == LONG_PRESS || touch.data.points > 0) {
+                // Touch detected, wait for full duration
+                uint32_t touchStart = millis();
+                while (millis() - touchStart < BOOT_LONG_PRESS_MS) {
+                    if (!touch.available()) {
+                        // Touch released too early
+                        return false;
+                    }
+                    delay(50);
+                }
+                // Held for full duration
+                Serial.println("Factory reset triggered!");
+                return true;
+            }
+        }
+        delay(50);
+    }
+    return false;
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -162,6 +256,22 @@ void setup()
     LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
 
     Serial.println(LVGL_Arduino);
+
+    // Initialize touch early for long-press detection
+    touch.begin();
+
+    // Check for factory reset (long press during boot)
+    factoryResetRequested = detectBootLongPress();
+
+    // Initialize settings
+    getSettings()->begin();
+
+    if (factoryResetRequested) {
+        Serial.println("Clearing settings (factory reset)");
+        getSettings()->clear();
+    } else {
+        getSettings()->load();
+    }
 
     lv_init();
 #if LV_USE_LOG != 0
@@ -176,7 +286,6 @@ void setup()
      the Generic -> Touch_calibrate example from the TFT_eSPI library*/
     // uint16_t calData[5] = { 275, 3620, 264, 3532, 1 };
     // tft.setTouch( calData );
-    touch.begin();
 
     Serial.println("Touch and TFT initialized");
 
@@ -202,7 +311,18 @@ void setup()
     current_screen = 0;
 
     splash = new SplashScreen(&on_loading_completed);
-    lv_disp_load_scr(splash->scr);
+    portalScreen = new PortalScreen();
+
+    // Decide initial mode based on settings
+    if (factoryResetRequested || !getSettings()->isConfigured()) {
+        Serial.println("Starting in portal mode (first run or reset)");
+        status = PORTAL_MODE;
+        lv_disp_load_scr(portalScreen->scr);
+    } else {
+        Serial.println("Starting normal boot with saved settings");
+        status = BOOT;
+        lv_disp_load_scr(splash->scr);
+    }
 
     // Setup timers
     const esp_timer_create_args_t lvgl_tick_timer_args = {
@@ -229,12 +349,25 @@ void setup()
 
 void loop()
 {
-    tick ++;
-    if (status == LOADING_COMPLETED)
-    {
-        status = RUNNING;
-        lv_disp_load_scr(screens[current_screen]->scr);
-        // lv_scr_load_anim(screens[current_screen], LV_SCR_LOAD_ANIM_MOVE_RIGHT, 100, 0, false);
+    tick++;
+
+    // Handle screen transitions based on status changes
+    static SAILDROP_STATUS lastStatus = BOOT;
+
+    if (status != lastStatus) {
+        if (status == PORTAL_MODE && lastStatus != PORTAL_MODE) {
+            // Entering portal mode - show portal screen
+            lv_disp_load_scr(portalScreen->scr);
+        }
+        else if (status == BOOT && lastStatus == PORTAL_MODE) {
+            // Exiting portal mode - show splash for normal boot
+            lv_disp_load_scr(splash->scr);
+        }
+        else if (status == LOADING_COMPLETED) {
+            status = RUNNING;
+            lv_disp_load_scr(screens[current_screen]->scr);
+        }
+        lastStatus = status;
     }
 
     lv_timer_handler();
