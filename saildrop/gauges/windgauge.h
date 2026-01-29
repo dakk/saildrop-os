@@ -144,7 +144,7 @@ public:
         // Wind type label (AWA/TWA)
         type_label = lv_label_create(bg);
         lv_obj_align(type_label, LV_ALIGN_CENTER, 0, -SCALE_PX(35));
-        lv_label_set_text(type_label, "APPARENT");
+        lv_label_set_text(type_label, "AW");
         lv_obj_set_style_text_color(type_label, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
         lv_obj_set_style_text_font(type_label, ui_scale::font_small(), 0);
 
@@ -191,13 +191,13 @@ public:
 
     void set_speed(int32_t speed) {
         char buf[8];
-        lv_snprintf(buf, sizeof(buf), "%d", speed / 10);
+        lv_snprintf(buf, sizeof(buf), "%d.%d", speed / 10, speed % 10);
         lv_label_set_text(speed_label, buf);
     }
 
     void set_type(bool apparent) {
         show_apparent = apparent;
-        lv_label_set_text(type_label, apparent ? "APPARENT" : "TRUE");
+        lv_label_set_text(type_label, apparent ? "AW" : "TW");
     }
 
     void toggle_mode() {
