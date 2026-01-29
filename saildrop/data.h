@@ -37,6 +37,14 @@ struct nmea_data {
 
 nmea_data *get_data();
 
+// Get TWA with fallback calculation from apparent wind if true wind is unavailable
+// Returns TWA in 0.1 degree units (0-3600)
+uint32_t get_twa();
+
+// Get TWS with fallback calculation from apparent wind if true wind is unavailable
+// Returns TWS in 0.1 knot units
+uint32_t get_tws();
+
 // TODO: use a singleton class instead?
 // TODO: add setters
 // TODO: add an handler list for new data (or stick with timers?)

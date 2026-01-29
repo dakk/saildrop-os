@@ -31,7 +31,7 @@
 #include "screens/portalscreen.h"
 #include "screens/aisscreen.h"
 #include "screens/contextmenu.h"
-// #include "screens/tackscreen.h"
+#include "screens/tackscreen.h"
 // #include "screens/timerscreen.h"
 
 #define DRAW_BUF_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT  / 10 * (LV_COLOR_DEPTH / 8))
@@ -285,7 +285,7 @@ void setup()
     add_screen(new CompassScreen());
     add_screen(new ValuesScreen());
     add_screen(new AISScreen());
-    // add_screen(new TackScreen());
+    add_screen(new TackScreen());
     // add_screen(new TimerScreen());
     current_screen = 0;
 

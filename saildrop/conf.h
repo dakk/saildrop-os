@@ -27,7 +27,6 @@
 #define SCREEN_HEIGHT 240
 
 // #define SHOWCASE
-// #define HOME_DEBUG
 
 // #define AP_MODE
 #define AP_SSID "SAILDROP_AP"
@@ -38,18 +37,10 @@
 #define PORTAL_PASS "saildrop"
 #define PORTAL_TIMEOUT_SEC 180  // 3 minutes
 
-#ifdef HOME_DEBUG
-    #define WIFI_DEFAULT_SSID "SD_NMEA"
-    #define WIFI_DEFAULT_PASSWORD "saildropwashere!!!!"
-    #define WIFI_DEFAULT_IP "192.168.4.2" //1.50"
-    #define WIFI_DEFAULT_UDP_PORT 2000
-    #define WIFI_DEFAULT_TCP_PORT 2001
-#else
-    #define WIFI_DEFAULT_SSID "DIVERSA_SAILING"
-    #define WIFI_DEFAULT_PASSWORD "12345678"
-    #define WIFI_DEFAULT_IP "192.168.4.1"
-    #define WIFI_DEFAULT_UDP_PORT 2000
-    #define WIFI_DEFAULT_TCP_PORT 2001
-#endif
+#define WIFI_DEFAULT_SSID "DIVERSA_SAILING"
+#define WIFI_DEFAULT_PASSWORD "12345678"
+#define WIFI_DEFAULT_IP "192.168.4.1"
+#define WIFI_DEFAULT_UDP_PORT 2000
+#define WIFI_DEFAULT_TCP_PORT 2001
 
 #endif
