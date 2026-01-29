@@ -316,19 +316,23 @@ void conn_loop_server() {
         // TCP server mode
         if (!tcpServer) return;
 
+        // Check for client disconnect (do this first to clean up stale connections)
+        if (serverClient && !serverClient.connected()) {
+            Serial.println("Client disconnected");
+            serverClient.stop();
+        }
+
         // Check for new client connections
         if (tcpServer->hasClient()) {
-            if (serverClient && serverClient.connected()) {
-                // Already have a client, reject new one
-                WiFiClient rejectedClient = tcpServer->available();
-                rejectedClient.stop();
-                Serial.println("Rejected new client (already connected)");
-            } else {
-                // Accept new client
-                serverClient = tcpServer->available();
-                Serial.printf("New client connected from %s\n",
-                             serverClient.remoteIP().toString().c_str());
+            // Close any existing connection to accept the new one
+            if (serverClient) {
+                Serial.println("Closing previous client connection");
+                serverClient.stop();
             }
+            // Accept new client
+            serverClient = tcpServer->available();
+            Serial.printf("New client connected from %s\n",
+                         serverClient.remoteIP().toString().c_str());
         }
 
         // Read data from connected client
@@ -352,11 +356,6 @@ void conn_loop_server() {
             }
         }
 
-        // Check for client disconnect
-        if (serverClient && !serverClient.connected()) {
-            Serial.println("Client disconnected");
-            serverClient.stop();
-        }
     }
 }
 

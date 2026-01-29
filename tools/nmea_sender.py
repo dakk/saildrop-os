@@ -93,45 +93,58 @@ def send_nmea_data(filepath: str, host: str, port: int, delay: float, start_line
     """Send NMEA data from file over TCP, one line per second."""
     print(f"Connecting to {host}:{port}...")
 
+    sock = None
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect((host, port))
-            print(f"Connected to {host}:{port}")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.settimeout(5.0)  # 5 second connection timeout
+        sock.connect((host, port))
+        sock.settimeout(None)  # Remove timeout for data transfer
+        print(f"Connected to {host}:{port}")
 
-            with open(filepath, 'r') as f:
-                lines = f.readlines()
+        with open(filepath, 'r') as f:
+            lines = f.readlines()
 
-            # Skip to start line (1-indexed)
-            if start_line > 1:
-                lines = lines[start_line - 1:]
-                print(f"Starting from line {start_line}, sending {len(lines)} lines from '{filepath}'...")
-            else:
-                print(f"Sending {len(lines)} lines from '{filepath}'...")
+        # Skip to start line (1-indexed)
+        if start_line > 1:
+            lines = lines[start_line - 1:]
+            print(f"Starting from line {start_line}, sending {len(lines)} lines from '{filepath}'...")
+        else:
+            print(f"Sending {len(lines)} lines from '{filepath}'...")
 
-            total_lines = len(lines)
-            for i, line in enumerate(lines, 1):
-                line = line.strip()
-                if not line:
-                    continue
+        total_lines = len(lines)
+        for i, line in enumerate(lines, 1):
+            line = line.strip()
+            if not line:
+                continue
 
-                # Ensure line ends with CRLF (NMEA standard)
-                if not line.endswith('\r\n'):
-                    line = line + '\r\n'
+            # Ensure line ends with CRLF (NMEA standard)
+            if not line.endswith('\r\n'):
+                line = line + '\r\n'
 
-                sock.sendall(line.encode('ascii'))
-                print(f"[{i}/{total_lines}] (line {start_line + i - 1}) {line.strip()}")
-                time.sleep(delay)
+            sock.sendall(line.encode('ascii'))
+            print(f"[{i}/{total_lines}] (line {start_line + i - 1}) {line.strip()}")
+            time.sleep(delay)
 
-            print("Done sending all lines.")
+        print("Done sending all lines.")
 
     except ConnectionRefusedError:
         print(f"Connection refused. Is the device listening on {host}:{port}?")
+        sys.exit(1)
+    except ConnectionResetError:
+        print(f"Connection reset by device. The device may have closed the connection.")
+        print("Hint: If reconnecting fails, restart the device or wait a few seconds.")
+    except socket.timeout:
+        print(f"Connection timed out. Is the device reachable at {host}:{port}?")
         sys.exit(1)
     except FileNotFoundError:
         print(f"File not found: {filepath}")
         sys.exit(1)
     except KeyboardInterrupt:
         pass  # Handled by signal_handler
+    finally:
+        if sock:
+            sock.close()
 
 
 def main():
