@@ -36,6 +36,98 @@ uint8_t packetBuffer[255];
 char nmeaBuffer[100];
 MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
 
+// Helper to parse custom NMEA sentences not handled by MicroNMEA
+void parse_custom_nmea(const char* sentence) {
+    if (sentence == nullptr || sentence[0] != '$') return;
+
+    // Get the sentence type (skip talker ID, get message type)
+    // Format: $XXYYY,... where XX is talker ID and YYY is message type
+    const char* msgStart = sentence + 3;  // Skip "$XX"
+
+    // Parse DBT - Depth Below Transducer
+    // Format: $--DBT,x.x,f,x.x,M,x.x,F*hh
+    if (strncmp(msgStart, "DBT", 3) == 0) {
+        const char* p = sentence;
+        int fieldNum = 0;
+
+        while (*p && fieldNum < 3) {
+            if (*p == ',') fieldNum++;
+            p++;
+        }
+
+        // Now at field 2 (depth in meters)
+        if (*p && *p != ',') {
+            float depthM = atof(p);
+            get_data()->depth = (uint32_t)(depthM * 10);  // Store in 0.1m units
+            Serial.printf("Depth: %.1f m\n", depthM);
+        }
+    }
+    // Parse MWV - Wind Speed and Angle
+    // Format: $--MWV,x.x,a,x.x,a,a*hh
+    // Fields: angle, R/T (relative/true), speed, units (K/N/M), status (A=valid)
+    else if (strncmp(msgStart, "MWV", 3) == 0) {
+        const char* p = sentence;
+        float windAngle = 0;
+        char refType = 'R';
+        float windSpeed = 0;
+        char speedUnits = 'N';
+        char status = 'V';
+        int fieldNum = 0;
+        const char* fieldStart = nullptr;
+
+        // Skip to first field
+        while (*p && *p != ',') p++;
+        if (*p) p++;
+        fieldStart = p;
+
+        // Parse each field
+        while (*p && *p != '*') {
+            if (*p == ',') {
+                switch (fieldNum) {
+                    case 0: windAngle = atof(fieldStart); break;
+                    case 1: refType = *fieldStart; break;
+                    case 2: windSpeed = atof(fieldStart); break;
+                    case 3: speedUnits = *fieldStart; break;
+                    case 4: status = *fieldStart; break;
+                }
+                fieldNum++;
+                p++;
+                fieldStart = p;
+            } else {
+                p++;
+            }
+        }
+        // Handle last field
+        if (fieldNum == 4 && fieldStart) {
+            status = *fieldStart;
+        }
+
+        // Only process valid data
+        if (status == 'A') {
+            // Convert speed to knots (stored in 0.1 knot units)
+            float speedKnots = windSpeed;
+            if (speedUnits == 'K' || speedUnits == 'k') {
+                speedKnots = windSpeed / 1.852;  // km/h to knots
+            } else if (speedUnits == 'M' || speedUnits == 'm') {
+                speedKnots = windSpeed * 1.944;  // m/s to knots
+            }
+
+            uint32_t angleVal = (uint32_t)windAngle;
+            uint32_t speedVal = (uint32_t)(speedKnots * 10);
+
+            if (refType == 'R') {
+                get_data()->awa = angleVal;
+                get_data()->aws = speedVal;
+                Serial.printf("Apparent Wind: %.1f° @ %.1f kn\n", windAngle, speedKnots);
+            } else {
+                get_data()->twa = angleVal;
+                get_data()->tws = speedVal;
+                Serial.printf("True Wind: %.1f° @ %.1f kn\n", windAngle, speedKnots);
+            }
+        }
+    }
+}
+
 // Forward declarations
 void conn_loop_server();
 void conn_loop_client();
@@ -166,8 +258,11 @@ void conn_loop_server() {
                              udp.remotePort(), packetBuffer);
 
                 // Process NMEA data
-                for (int i = 0; i < len; i++)
-                    nmea.process(packetBuffer[i]);
+                for (int i = 0; i < len; i++) {
+                    if (nmea.process(packetBuffer[i])) {
+                        parse_custom_nmea(nmea.getSentence());
+                    }
+                }
 
                 get_data()->sog = nmea.getSpeed() / 100.;
                 get_data()->hdg = nmea.getCourse() / 1000.;
@@ -200,8 +295,11 @@ void conn_loop_server() {
                 Serial.printf("Received: %s\n", packetBuffer);
 
                 // Process NMEA data
-                for (int i = 0; i < len; i++)
-                    nmea.process(packetBuffer[i]);
+                for (int i = 0; i < len; i++) {
+                    if (nmea.process(packetBuffer[i])) {
+                        parse_custom_nmea(nmea.getSentence());
+                    }
+                }
 
                 get_data()->sog = nmea.getSpeed() / 100.;
                 get_data()->hdg = nmea.getCourse() / 1000.;
@@ -237,8 +335,11 @@ void conn_loop_client() {
                 packetBuffer[len] = '\0';
                 Serial.printf("UDP Received: %s\n", packetBuffer);
 
-                for (int i = 0; i < len; i++)
-                    nmea.process(packetBuffer[i]);
+                for (int i = 0; i < len; i++) {
+                    if (nmea.process(packetBuffer[i])) {
+                        parse_custom_nmea(nmea.getSentence());
+                    }
+                }
 
                 get_data()->sog = nmea.getSpeed() / 100.;
                 get_data()->hdg = nmea.getCourse() / 1000.;
@@ -266,8 +367,11 @@ void conn_loop_client() {
                 packetBuffer[len] = '\0';  // null-terminate properly
                 Serial.printf("Received: %s\n", packetBuffer);
 
-                for (int i = 0; i < len; i++)
-                    nmea.process(packetBuffer[i]);
+                for (int i = 0; i < len; i++) {
+                    if (nmea.process(packetBuffer[i])) {
+                        parse_custom_nmea(nmea.getSentence());
+                    }
+                }
 
                 Serial.print("Speed: ");
                 get_data()->sog = nmea.getSpeed() / 100.;

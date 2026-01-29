@@ -144,7 +144,7 @@ public:
         // Wind type label (AWA/TWA)
         type_label = lv_label_create(bg);
         lv_obj_align(type_label, LV_ALIGN_CENTER, 0, -SCALE_PX(35));
-        lv_label_set_text(type_label, "AWA");
+        lv_label_set_text(type_label, "APPARENT");
         lv_obj_set_style_text_color(type_label, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
         lv_obj_set_style_text_font(type_label, ui_scale::font_small(), 0);
 
@@ -168,14 +168,6 @@ public:
         lv_obj_set_style_line_color(needle, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
         lv_obj_set_style_line_rounded(needle, true, LV_PART_MAIN);
         update_needle(0);
-
-        // Needle center dot
-        lv_obj_t *center_dot = lv_obj_create(bg);
-        lv_obj_set_size(center_dot, SCALE_PX(16), SCALE_PX(16));
-        lv_obj_center(center_dot);
-        lv_obj_set_style_radius(center_dot, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_color(center_dot, lv_palette_main(LV_PALETTE_ORANGE), 0);
-        lv_obj_set_style_border_width(center_dot, 0, 0);
 
         lv_timer_create(tick_cb, 100, this);
     }
@@ -205,7 +197,7 @@ public:
 
     void set_type(bool apparent) {
         show_apparent = apparent;
-        lv_label_set_text(type_label, apparent ? "AWA" : "TWA");
+        lv_label_set_text(type_label, apparent ? "APPARENT" : "TRUE");
     }
 
     void toggle_mode() {

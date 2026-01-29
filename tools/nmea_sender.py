@@ -135,7 +135,7 @@ def main():
     parser.add_argument("file", help="NMEA data file to send")
     parser.add_argument("--host", default=DEFAULT_HOST, help=f"Device IP (default: {DEFAULT_HOST})")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"TCP port (default: {DEFAULT_PORT})")
-    parser.add_argument("--delay", type=float, default=1.0, help="Delay between lines in seconds (default: 1.0)")
+    parser.add_argument("--delay", type=float, default=0.1, help="Delay between lines in seconds (default: 1.0)")
     parser.add_argument("--no-wifi", action="store_true", help="Skip WiFi connection (already connected)")
     parser.add_argument("--loop", action="store_true", help="Loop the file continuously")
 

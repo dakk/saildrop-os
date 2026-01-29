@@ -41,6 +41,7 @@ public:
 void values_tick_cb(lv_timer_t *timer)
 {
     ValuesScreen *gauge = (ValuesScreen *) lv_timer_get_user_data(timer);
+    gauge->gauges[GAUGE_IDX_DEPTH]->set_value(get_data()->depth);
     gauge->gauges[GAUGE_IDX_SOG]->set_value(get_data()->sog);
     gauge->gauges[GAUGE_IDX_HDG]->set_value(get_data()->hdg);
 }

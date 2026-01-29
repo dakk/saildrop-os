@@ -26,6 +26,8 @@ struct nmea_data {
     uint32_t twa;
     uint32_t aws;
     uint32_t awa;
+
+    uint32_t depth;  // Depth in 0.1m units
 };
 
 nmea_data *get_data();
