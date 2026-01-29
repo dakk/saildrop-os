@@ -397,6 +397,18 @@ void loop()
                     delay(500);
                     ESP.restart();
                     break;
+                case MENU_TOGGLE_AP_MODE:
+                    {
+                        bool currentApMode = getSettings()->get()->ap_mode;
+                        Serial.printf("Context menu: Toggle AP mode %s -> %s\n",
+                                     currentApMode ? "ON" : "OFF",
+                                     !currentApMode ? "ON" : "OFF");
+                        getSettings()->setApMode(!currentApMode);
+                        getSettings()->save();
+                        delay(500);
+                        ESP.restart();
+                    }
+                    break;
                 case MENU_REBOOT:
                     Serial.println("Context menu: Reboot requested");
                     delay(500);

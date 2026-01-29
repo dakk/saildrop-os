@@ -23,12 +23,14 @@
 enum ContextMenuAction {
     MENU_NONE = 0,
     MENU_RESET_SETTINGS,
+    MENU_TOGGLE_AP_MODE,
     MENU_REBOOT,
     MENU_CLOSE
 };
 
 static ContextMenuAction contextMenuResult = MENU_NONE;
 static lv_obj_t *contextMenuScreen = NULL;
+static lv_obj_t *apModeLabel = NULL;
 static bool contextMenuVisible = false;
 
 static void context_menu_btn_event_cb(lv_event_t *e) {
@@ -76,23 +78,34 @@ void context_menu_create() {
     lv_label_set_text(title, "Menu");
     lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_20, LV_PART_MAIN);
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 30);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
 
     // Static action values for callbacks
+    static ContextMenuAction apModeAction = MENU_TOGGLE_AP_MODE;
     static ContextMenuAction resetAction = MENU_RESET_SETTINGS;
     static ContextMenuAction rebootAction = MENU_REBOOT;
     static ContextMenuAction closeAction = MENU_CLOSE;
 
-    // Create buttons
-    create_menu_button(contextMenuScreen, "Reset Settings", -25, &resetAction);
-    create_menu_button(contextMenuScreen, "Reboot", 30, &rebootAction);
-    create_menu_button(contextMenuScreen, "Close", 85, &closeAction);
+    // Create buttons (adjusted y positions for 4 buttons)
+    lv_obj_t *apBtn = create_menu_button(contextMenuScreen, "AP Mode: ---", -50, &apModeAction);
+    apModeLabel = lv_obj_get_child(apBtn, 0);  // Get the label inside the button
+
+    create_menu_button(contextMenuScreen, "Reset Settings", 5, &resetAction);
+    create_menu_button(contextMenuScreen, "Reboot", 60, &rebootAction);
+    create_menu_button(contextMenuScreen, "Close", 115, &closeAction);
 }
 
 void context_menu_show(lv_obj_t *previousScreen) {
     if (contextMenuScreen == NULL) {
         context_menu_create();
     }
+
+    // Update AP mode button label with current setting
+    if (apModeLabel != NULL) {
+        bool apMode = getSettings()->get()->ap_mode;
+        lv_label_set_text(apModeLabel, apMode ? "AP Mode: ON" : "AP Mode: OFF");
+    }
+
     contextMenuResult = MENU_NONE;
     contextMenuVisible = true;
     lv_scr_load_anim(contextMenuScreen, LV_SCR_LOAD_ANIM_FADE_IN, 200, 0, false);
