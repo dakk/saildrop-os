@@ -89,7 +89,7 @@ def connect_wifi(ssid: str, password: str) -> bool:
         return False
 
 
-def send_nmea_data(filepath: str, host: str, port: int, delay: float) -> None:
+def send_nmea_data(filepath: str, host: str, port: int, delay: float, start_line: int = 1) -> None:
     """Send NMEA data from file over TCP, one line per second."""
     print(f"Connecting to {host}:{port}...")
 
@@ -101,8 +101,14 @@ def send_nmea_data(filepath: str, host: str, port: int, delay: float) -> None:
             with open(filepath, 'r') as f:
                 lines = f.readlines()
 
-            print(f"Sending {len(lines)} lines from '{filepath}'...")
+            # Skip to start line (1-indexed)
+            if start_line > 1:
+                lines = lines[start_line - 1:]
+                print(f"Starting from line {start_line}, sending {len(lines)} lines from '{filepath}'...")
+            else:
+                print(f"Sending {len(lines)} lines from '{filepath}'...")
 
+            total_lines = len(lines)
             for i, line in enumerate(lines, 1):
                 line = line.strip()
                 if not line:
@@ -113,7 +119,7 @@ def send_nmea_data(filepath: str, host: str, port: int, delay: float) -> None:
                     line = line + '\r\n'
 
                 sock.sendall(line.encode('ascii'))
-                print(f"[{i}/{len(lines)}] {line.strip()}")
+                print(f"[{i}/{total_lines}] (line {start_line + i - 1}) {line.strip()}")
                 time.sleep(delay)
 
             print("Done sending all lines.")
@@ -135,7 +141,8 @@ def main():
     parser.add_argument("file", help="NMEA data file to send")
     parser.add_argument("--host", default=DEFAULT_HOST, help=f"Device IP (default: {DEFAULT_HOST})")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"TCP port (default: {DEFAULT_PORT})")
-    parser.add_argument("--delay", type=float, default=0.1, help="Delay between lines in seconds (default: 1.0)")
+    parser.add_argument("--delay", type=float, default=0.1, help="Delay between lines in seconds (default: 0.1)")
+    parser.add_argument("--start-line", type=int, default=1, help="Line number to start from (default: 1)")
     parser.add_argument("--no-wifi", action="store_true", help="Skip WiFi connection (already connected)")
     parser.add_argument("--loop", action="store_true", help="Loop the file continuously")
 
@@ -159,9 +166,9 @@ def main():
 
     if args.loop:
         while True:
-            send_nmea_data(args.file, args.host, args.port, args.delay)
+            send_nmea_data(args.file, args.host, args.port, args.delay, args.start_line)
     else:
-        send_nmea_data(args.file, args.host, args.port, args.delay)
+        send_nmea_data(args.file, args.host, args.port, args.delay, args.start_line)
 
 
 if __name__ == "__main__":
