@@ -18,8 +18,10 @@
 #define CONN_H
 
 #include <WiFi.h>
+#include "settings.h"
 
 void initialize_connections();
+void initialize_connections_ap(uint16_t listen_port, NmeaProtocol protocol);
 void list_networks();
 void connect_wifi(const char *ssid, const char *password);
 void disconnect_wifi();
