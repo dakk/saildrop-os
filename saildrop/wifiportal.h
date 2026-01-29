@@ -41,6 +41,9 @@ enum PortalStatus {
 };
 
 class WifiPortal {
+    // Allow save callback to access private members
+    friend void saveAllParameters();
+
 private:
     WiFiManager wm;
     // Station mode parameters

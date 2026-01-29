@@ -19,9 +19,89 @@
 
 static WifiPortal portalInstance;
 
+// Forward declaration for saving parameters
+void saveAllParameters();
+
 // Callback for when config is saved
 static void saveConfigCallback() {
     Serial.println("WiFiManager: Config saved callback triggered");
+
+    // Save all parameters immediately in the callback
+    saveAllParameters();
+
+    // Check if AP mode is enabled - if so, restart immediately
+    // because WiFiManager won't connect to WiFi in AP mode
+    if (getSettings()->get()->ap_mode) {
+        Serial.println("AP mode enabled, restarting...");
+        delay(1000);
+        ESP.restart();
+    }
+}
+
+// Save all parameters from the portal to settings
+void saveAllParameters() {
+    WifiPortal* portal = &portalInstance;
+
+    Serial.println("Saving all parameters...");
+
+    // Check if AP mode is enabled (checkbox returns "1" if checked)
+    bool apModeEnabled = portal->wm.server->hasArg("ap_mode") &&
+                         portal->wm.server->arg("ap_mode") == "1";
+    getSettings()->setApMode(apModeEnabled);
+    Serial.printf("  AP Mode: %s\n", apModeEnabled ? "enabled" : "disabled");
+
+    // Save AP mode parameters
+    if (portal->paramApSsid && strlen(portal->paramApSsid->getValue()) > 0) {
+        getSettings()->setApSsid(portal->paramApSsid->getValue());
+        Serial.printf("  AP SSID: %s\n", portal->paramApSsid->getValue());
+    }
+
+    if (portal->paramApPass && strlen(portal->paramApPass->getValue()) > 0) {
+        getSettings()->setApPass(portal->paramApPass->getValue());
+    }
+
+    if (portal->paramListenPort && strlen(portal->paramListenPort->getValue()) > 0) {
+        uint16_t port = atoi(portal->paramListenPort->getValue());
+        if (port > 0 && port <= 65535) {
+            getSettings()->setListenPort(port);
+            Serial.printf("  Listen Port: %d\n", port);
+        }
+    }
+
+    // Save listen protocol (AP mode)
+    if (portal->wm.server->hasArg("listen_proto")) {
+        int proto = atoi(portal->wm.server->arg("listen_proto").c_str());
+        getSettings()->setListenProtocol(proto == 1 ? PROTO_UDP : PROTO_TCP);
+        Serial.printf("  Listen Protocol: %s\n", proto == 1 ? "UDP" : "TCP");
+    }
+
+    // Save station mode parameters
+    if (portal->paramNmeaIp && strlen(portal->paramNmeaIp->getValue()) > 0) {
+        getSettings()->setNmeaIp(portal->paramNmeaIp->getValue());
+        Serial.printf("  NMEA IP: %s\n", portal->paramNmeaIp->getValue());
+    }
+
+    if (portal->paramNmeaPort && strlen(portal->paramNmeaPort->getValue()) > 0) {
+        uint16_t port = atoi(portal->paramNmeaPort->getValue());
+        if (port > 0 && port <= 65535) {
+            getSettings()->setNmeaPort(port);
+            Serial.printf("  NMEA Port: %d\n", port);
+        }
+    }
+
+    // Save station mode protocol
+    if (portal->wm.server->hasArg("protocol")) {
+        int proto = atoi(portal->wm.server->arg("protocol").c_str());
+        getSettings()->setProtocol(proto == 1 ? PROTO_UDP : PROTO_TCP);
+        Serial.printf("  Protocol: %s\n", proto == 1 ? "UDP" : "TCP");
+    }
+
+    // Save WiFi credentials to our settings (even if AP mode, keep them for later)
+    getSettings()->setWifiSsid(WiFi.SSID().c_str());
+    getSettings()->setWifiPass(WiFi.psk().c_str());
+
+    // Persist to NVS
+    getSettings()->save();
 }
 
 WifiPortal* getPortal() {
@@ -184,6 +264,10 @@ void WifiPortal::begin() {
 
     // Set save config callback
     wm.setSaveConfigCallback(saveConfigCallback);
+
+    // Break after config save even if WiFi connection fails
+    // This is needed for AP mode where we don't connect to any WiFi
+    wm.setBreakAfterConfig(true);
 
     // Configure portal timeout
     wm.setConfigPortalTimeout(PORTAL_TIMEOUT_SEC);
