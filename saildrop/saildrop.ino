@@ -23,16 +23,32 @@
 #include "wifiportal.h"
 
 #include "screens/screen.h"
-#include "screens/compassscreen.h"
-#include "screens/speedscreen.h"
-#include "screens/windscreen.h"
 #include "screens/splashscreen.h"
-#include "screens/valuesscreen.h"
 #include "screens/portalscreen.h"
-#include "screens/aisscreen.h"
 #include "screens/contextmenu.h"
+
+// Conditionally include screens based on conf.h
+#ifdef SCREEN_SPEED
+#include "screens/speedscreen.h"
+#endif
+#ifdef SCREEN_WIND
+#include "screens/windscreen.h"
+#endif
+#ifdef SCREEN_COMPASS
+#include "screens/compassscreen.h"
+#endif
+#ifdef SCREEN_VALUES
+#include "screens/valuesscreen.h"
+#endif
+#ifdef SCREEN_AIS
+#include "screens/aisscreen.h"
+#endif
+#ifdef SCREEN_TACK
 #include "screens/tackscreen.h"
-// #include "screens/timerscreen.h"
+#endif
+#ifdef SCREEN_TIMER
+#include "screens/timerscreen.h"
+#endif
 
 #define DRAW_BUF_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT  / 10 * (LV_COLOR_DEPTH / 8))
 uint32_t draw_buf[DRAW_BUF_SIZE / 4];
@@ -278,15 +294,52 @@ void setup()
     lv_indev_set_read_cb(indev, my_touchpad_read);
 
 
-    //////////////// Create screens
+    //////////////// Create screens in order defined by conf.h
     Serial.println("LVGL initialized.\nCreating screens...");
-    add_screen(new SpeedScreen());
-    add_screen(new WindScreen());
-    add_screen(new CompassScreen());
-    add_screen(new ValuesScreen());
-    add_screen(new AISScreen());
-    add_screen(new TackScreen());
-    // add_screen(new TimerScreen());
+
+    // Screen order array - add screens sorted by their order value
+    struct ScreenEntry { int order; Screen* (*create)(); };
+    ScreenEntry entries[] = {
+        #ifdef SCREEN_SPEED
+        { SCREEN_SPEED, []() -> Screen* { return new SpeedScreen(); } },
+        #endif
+        #ifdef SCREEN_WIND
+        { SCREEN_WIND, []() -> Screen* { return new WindScreen(); } },
+        #endif
+        #ifdef SCREEN_COMPASS
+        { SCREEN_COMPASS, []() -> Screen* { return new CompassScreen(); } },
+        #endif
+        #ifdef SCREEN_VALUES
+        { SCREEN_VALUES, []() -> Screen* { return new ValuesScreen(); } },
+        #endif
+        #ifdef SCREEN_AIS
+        { SCREEN_AIS, []() -> Screen* { return new AISScreen(); } },
+        #endif
+        #ifdef SCREEN_TACK
+        { SCREEN_TACK, []() -> Screen* { return new TackScreen(); } },
+        #endif
+        #ifdef SCREEN_TIMER
+        { SCREEN_TIMER, []() -> Screen* { return new TimerScreen(); } },
+        #endif
+    };
+
+    // Sort by order value (simple bubble sort for small array)
+    int n_entries = sizeof(entries) / sizeof(entries[0]);
+    for (int i = 0; i < n_entries - 1; i++) {
+        for (int j = 0; j < n_entries - i - 1; j++) {
+            if (entries[j].order > entries[j + 1].order) {
+                ScreenEntry tmp = entries[j];
+                entries[j] = entries[j + 1];
+                entries[j + 1] = tmp;
+            }
+        }
+    }
+
+    // Add screens in sorted order
+    for (int i = 0; i < n_entries; i++) {
+        add_screen(entries[i].create());
+    }
+
     current_screen = 0;
 
     splash = new SplashScreen(&on_loading_completed);

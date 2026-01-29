@@ -28,6 +28,16 @@
 
 // #define SHOWCASE
 
+// Screen configuration - comment out to disable, reorder to change sequence
+// The order here determines swipe order (left/right navigation)
+#define SCREEN_SPEED      1
+#define SCREEN_WIND       2
+#define SCREEN_COMPASS    3
+#define SCREEN_VALUES     4
+#define SCREEN_AIS        5
+#define SCREEN_TACK       6
+// #define SCREEN_TIMER   7  // Not yet implemented
+
 // #define AP_MODE
 #define AP_SSID "SAILDROP_AP"
 #define AP_PASS "12345678"
