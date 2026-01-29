@@ -30,6 +30,7 @@
 #include "screens/valuesscreen.h"
 #include "screens/portalscreen.h"
 #include "screens/aisscreen.h"
+#include "screens/contextmenu.h"
 // #include "screens/tackscreen.h"
 // #include "screens/timerscreen.h"
 
@@ -62,10 +63,6 @@ enum SAILDROP_STATUS
     SETUP_DONE,
     RUNNING
 };
-
-// Long press detection for factory reset
-#define BOOT_LONG_PRESS_MS 3000
-bool factoryResetRequested = false;
 
 SAILDROP_STATUS status = BOOT;
 uint32_t tick = 0;
@@ -171,25 +168,41 @@ void on_tick(void *arg)
 /*Read the touchpad*/
 void my_touchpad_read( lv_indev_t * indev, lv_indev_data_t * data )
 {
-    // uint16_t touchX, touchY;
-
     bool touched = touch.available();
-    // touch.read_touch();
     if (!touched)
-    // if( 0!=touch.data.points )
     {
         data->state = LV_INDEV_STATE_REL;
     }
     else
     {
         data->state = LV_INDEV_STATE_PR;
-        Serial.printf("Gesture: %s, ID: %d, status: %d, tick: %lu, last: %lu\n",
-                      touch.gesture(), touch.data.gestureID, status, tick, last_handled_gesture_tick);
+        data->point.x = touch.data.x;
+        data->point.y = touch.data.y;
+
+        Serial.printf("Gesture: %s, ID: %d, x: %d, y: %d, status: %d, tick: %lu, last: %lu\n",
+                      touch.gesture(), touch.data.gestureID, touch.data.x, touch.data.y, status, tick, last_handled_gesture_tick);
 
         if (status != RUNNING || (tick - last_handled_gesture_tick) < 50)
             return;
 
         Serial.printf("Handling gesture ID: %d\n", touch.data.gestureID);
+
+        // Handle long press globally (works even when context menu is visible)
+        if (touch.data.gestureID == LONG_PRESS)
+        {
+            if (!context_menu_is_visible()) {
+                context_menu_show(screens[current_screen]->scr);
+            }
+            last_handled_gesture_tick = tick;
+            return;
+        }
+
+        // When context menu is visible, let LVGL handle clicks but block swipe gestures
+        if (context_menu_is_visible()) {
+            // Allow single clicks to pass through to LVGL for button handling
+            return;
+        }
+
         if (touch.data.gestureID == SWIPE_LEFT)
         {
             current_screen = (current_screen + num_screens - 1) % num_screens;
@@ -221,33 +234,6 @@ void on_loading_completed()
     status = LOADING_COMPLETED;
 }
 
-// Detect long press at boot for factory reset
-bool detectBootLongPress() {
-    Serial.println("Hold touch for 3 seconds to factory reset...");
-    uint32_t start = millis();
-
-    while (millis() - start < BOOT_LONG_PRESS_MS) {
-        if (touch.available()) {
-            if (touch.data.gestureID == LONG_PRESS || touch.data.points > 0) {
-                // Touch detected, wait for full duration
-                uint32_t touchStart = millis();
-                while (millis() - touchStart < BOOT_LONG_PRESS_MS) {
-                    if (!touch.available()) {
-                        // Touch released too early
-                        return false;
-                    }
-                    delay(50);
-                }
-                // Held for full duration
-                Serial.println("Factory reset triggered!");
-                return true;
-            }
-        }
-        delay(50);
-    }
-    return false;
-}
-
 void setup()
 {
     Serial.begin(115200);
@@ -258,21 +244,12 @@ void setup()
 
     Serial.println(LVGL_Arduino);
 
-    // Initialize touch early for long-press detection
+    // Initialize touch
     touch.begin();
-
-    // Check for factory reset (long press during boot)
-    factoryResetRequested = detectBootLongPress();
 
     // Initialize settings
     getSettings()->begin();
-
-    if (factoryResetRequested) {
-        Serial.println("Clearing settings (factory reset)");
-        getSettings()->clear();
-    } else {
-        getSettings()->load();
-    }
+    getSettings()->load();
 
     lv_init();
 #if LV_USE_LOG != 0
@@ -315,8 +292,11 @@ void setup()
     splash = new SplashScreen(&on_loading_completed);
     portalScreen = new PortalScreen();
 
+    // Create context menu (long press menu)
+    context_menu_create();
+
     // Decide initial mode based on settings
-    if (factoryResetRequested || !getSettings()->isConfigured()) {
+    if (!getSettings()->isConfigured()) {
         Serial.println("Starting in portal mode (first run or reset)");
         status = PORTAL_MODE;
         lv_disp_load_scr(portalScreen->scr);
@@ -352,6 +332,33 @@ void setup()
 void loop()
 {
     tick++;
+
+    // Handle context menu actions
+    if (context_menu_is_visible()) {
+        ContextMenuAction action = context_menu_get_result();
+        if (action != MENU_NONE) {
+            switch (action) {
+                case MENU_RESET_SETTINGS:
+                    Serial.println("Context menu: Reset settings requested");
+                    getSettings()->clear();
+                    delay(500);
+                    ESP.restart();
+                    break;
+                case MENU_REBOOT:
+                    Serial.println("Context menu: Reboot requested");
+                    delay(500);
+                    ESP.restart();
+                    break;
+                case MENU_CLOSE:
+                    Serial.println("Context menu: Close requested");
+                    context_menu_hide(screens[current_screen]->scr);
+                    break;
+                default:
+                    break;
+            }
+            context_menu_clear_result();
+        }
+    }
 
     // Handle screen transitions based on status changes
     static SAILDROP_STATUS lastStatus = BOOT;
