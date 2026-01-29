@@ -44,7 +44,7 @@ private:
     lv_point_precise_t target_pts[AIS_MAX_TARGETS * 3][2];
 
     // Range options in nautical miles
-    static constexpr float RANGE_OPTIONS[] = {0.5f, 1.0f, 2.0f, 5.0f, 10.0f};
+    static constexpr float RANGE_OPTIONS[] = {1.0f, 2.0f, 5.0f, 10.0f, 25.0f};
     static constexpr uint8_t NUM_RANGES = 5;
     uint8_t range_index = 2;  // Default to 2 NM
     float range_nm = 2.0f;
@@ -197,19 +197,19 @@ public:
             lv_obj_add_flag(target_lines[i], LV_OBJ_FLAG_HIDDEN);
         }
 
-        // Range label (bottom center)
-        range_label = lv_label_create(bg);
-        lv_obj_align(range_label, LV_ALIGN_BOTTOM_MID, 0, -SCALE_PX(35));
-        lv_obj_set_style_text_color(range_label, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
-        lv_obj_set_style_text_font(range_label, ui_scale::font_small(), 0);
-        update_range_label();
-
         // Target count label (top center)
         count_label = lv_label_create(bg);
-        lv_obj_align(count_label, LV_ALIGN_TOP_MID, 0, SCALE_PX(35));
+        lv_obj_align(count_label, LV_ALIGN_TOP_MID, 0, SCALE_PX(5));
         lv_obj_set_style_text_color(count_label, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
         lv_obj_set_style_text_font(count_label, ui_scale::font_small(), 0);
         lv_label_set_text(count_label, "0");
+
+        // Range label (bottom center)
+        range_label = lv_label_create(bg);
+        lv_obj_align(range_label, LV_ALIGN_BOTTOM_MID, 0, -SCALE_PX(5));
+        lv_obj_set_style_text_color(range_label, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
+        lv_obj_set_style_text_font(range_label, ui_scale::font_small(), 0);
+        update_range_label();
 
         // No GPS warning (center, hidden by default)
         no_gps_label = lv_label_create(bg);
@@ -224,11 +224,7 @@ public:
 
     void update_range_label() {
         char buf[16];
-        if (range_nm < 1.0f) {
-            lv_snprintf(buf, sizeof(buf), "%.1f NM", range_nm);
-        } else {
-            lv_snprintf(buf, sizeof(buf), "%d NM", (int)range_nm);
-        }
+        lv_snprintf(buf, sizeof(buf), "%d NM", (int)range_nm);
         lv_label_set_text(range_label, buf);
     }
 
