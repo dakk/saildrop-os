@@ -17,6 +17,7 @@
 #define SETUPSCREEN_H
 
 #include "screen.h"
+#include "../scale.h"
 
 class SetupScreen : public Screen
 {
@@ -28,7 +29,7 @@ public:
         lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
         lv_obj_t *cont_col = lv_obj_create(scr);
-        lv_obj_set_size(cont_col, 200, 150);
+        lv_obj_set_size(cont_col, SCALE_PX(200), SCALE_PX(150));
         // lv_obj_align_to(cont_col, cont_row, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
         lv_obj_set_flex_flow(cont_col, LV_FLEX_FLOW_COLUMN);
 

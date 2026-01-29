@@ -18,6 +18,7 @@
 
 #include <lvgl.h>
 #include <string.h>
+#include "../scale.h"
 #include "styles.h"
 
 class ValueGauge {
@@ -50,40 +51,40 @@ public:
 
         // Arc indicator (background track)
         arc_indicator = lv_arc_create(bg);
-        lv_obj_set_size(arc_indicator, width - 10, height - 10);
+        lv_obj_set_size(arc_indicator, width - SCALE_PX(10), height - SCALE_PX(10));
         lv_obj_center(arc_indicator);
         lv_arc_set_rotation(arc_indicator, 135);
         lv_arc_set_bg_angles(arc_indicator, 0, 270);
         lv_arc_set_value(arc_indicator, 0);
         lv_obj_remove_style(arc_indicator, nullptr, LV_PART_KNOB);
         lv_obj_remove_flag(arc_indicator, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_style_arc_width(arc_indicator, 8, LV_PART_MAIN);
+        lv_obj_set_style_arc_width(arc_indicator, SCALE_PX(8), LV_PART_MAIN);
         lv_obj_set_style_arc_color(arc_indicator, lv_palette_darken(LV_PALETTE_GREY, 3), LV_PART_MAIN);
-        lv_obj_set_style_arc_width(arc_indicator, 8, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_width(arc_indicator, SCALE_PX(8), LV_PART_INDICATOR);
         lv_obj_set_style_arc_color(arc_indicator, accent_color, LV_PART_INDICATOR);
         lv_obj_set_style_arc_rounded(arc_indicator, false, LV_PART_MAIN);
         lv_obj_set_style_arc_rounded(arc_indicator, false, LV_PART_INDICATOR);
 
         // Title label
         lv_obj_t *title = lv_label_create(bg);
-        lv_obj_align(title, LV_ALIGN_CENTER, 0, -50);
+        lv_obj_align(title, LV_ALIGN_CENTER, 0, -SCALE_PX(50));
         lv_label_set_text(title, label_str);
         lv_obj_set_style_text_color(title, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
-        lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(title, ui_scale::font_small(), 0);
 
         // Main value label (big digits)
         value_label = lv_label_create(bg);
         lv_obj_align(value_label, LV_ALIGN_CENTER, 0, 0);
         lv_obj_set_style_text_color(value_label, lv_color_white(), 0);
-        lv_obj_set_style_text_font(value_label, &lv_font_montserrat_48, 0);
+        lv_obj_set_style_text_font(value_label, ui_scale::font_large(), 0);
         lv_label_set_text(value_label, "---");
 
         // Unit label
         lv_obj_t *unit_lbl = lv_label_create(bg);
-        lv_obj_align(unit_lbl, LV_ALIGN_CENTER, 0, 45);
+        lv_obj_align(unit_lbl, LV_ALIGN_CENTER, 0, SCALE_PX(45));
         lv_label_set_text(unit_lbl, unit_str);
         lv_obj_set_style_text_color(unit_lbl, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
-        lv_obj_set_style_text_font(unit_lbl, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(unit_lbl, ui_scale::font_medium(), 0);
     }
 
     void set_value(int32_t val) {

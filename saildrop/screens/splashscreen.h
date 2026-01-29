@@ -19,6 +19,7 @@
 #include "screen.h"
 #include "../conn.h"
 #include "../conf.h"
+#include "../scale.h"
 
 class SplashScreen : public Screen {
 private:
@@ -43,7 +44,7 @@ private:
         lv_obj_t *obj = static_cast<lv_obj_t*>(var);
         lv_obj_set_size(obj, value, value);
         lv_obj_center(obj);
-        lv_obj_set_y(obj, 20);
+        lv_obj_set_y(obj, SCALE_PX(20));
     }
 
     static void ripple_opa_cb(void *var, int32_t value) {
@@ -57,7 +58,7 @@ private:
         lv_anim_init(&size_anim);
         lv_anim_set_var(&size_anim, ripple);
         lv_anim_set_exec_cb(&size_anim, ripple_size_cb);
-        lv_anim_set_values(&size_anim, 10, 180);
+        lv_anim_set_values(&size_anim, SCALE_PX(10), SCALE_PX(180));
         lv_anim_set_time(&size_anim, 1500);
         lv_anim_set_delay(&size_anim, delay_ms);
         lv_anim_set_repeat_count(&size_anim, LV_ANIM_REPEAT_INFINITE);
@@ -90,12 +91,12 @@ private:
 
     lv_obj_t* create_ripple() {
         lv_obj_t *ripple = lv_obj_create(scr);
-        lv_obj_set_size(ripple, 10, 10);
+        lv_obj_set_size(ripple, SCALE_PX(10), SCALE_PX(10));
         lv_obj_center(ripple);
-        lv_obj_set_y(ripple, 20);
+        lv_obj_set_y(ripple, SCALE_PX(20));
         lv_obj_set_style_radius(ripple, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_opa(ripple, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(ripple, 3, 0);
+        lv_obj_set_style_border_width(ripple, SCALE_PX(3), 0);
         lv_obj_set_style_border_color(ripple, lv_palette_main(LV_PALETTE_ORANGE), 0);
         lv_obj_set_style_border_opa(ripple, 0, 0);
         lv_obj_remove_flag(ripple, LV_OBJ_FLAG_SCROLLABLE);
@@ -116,9 +117,9 @@ public:
 
         // Water drop
         drop = lv_obj_create(scr);
-        lv_obj_set_size(drop, 20, 28);
-        lv_obj_align(drop, LV_ALIGN_TOP_MID, 0, -30);
-        lv_obj_set_style_radius(drop, 10, 0);
+        lv_obj_set_size(drop, SCALE_PX(20), SCALE_PX(28));
+        lv_obj_align(drop, LV_ALIGN_TOP_MID, 0, -SCALE_PX(30));
+        lv_obj_set_style_radius(drop, SCALE_PX(10), 0);
         lv_obj_set_style_bg_color(drop, lv_palette_main(LV_PALETTE_ORANGE), 0);
         lv_obj_set_style_border_width(drop, 0, 0);
         lv_obj_remove_flag(drop, LV_OBJ_FLAG_SCROLLABLE);
@@ -128,7 +129,7 @@ public:
         lv_anim_init(&fall_anim);
         lv_anim_set_var(&fall_anim, drop);
         lv_anim_set_exec_cb(&fall_anim, drop_fall_cb);
-        lv_anim_set_values(&fall_anim, -30, 100);
+        lv_anim_set_values(&fall_anim, -SCALE_PX(30), SCALE_PX(100));
         lv_anim_set_time(&fall_anim, 800);
         lv_anim_set_path_cb(&fall_anim, lv_anim_path_ease_in);
         lv_anim_set_user_data(&fall_anim, this);
@@ -137,10 +138,10 @@ public:
 
         // Title label
         lv_obj_t *title = lv_label_create(scr);
-        lv_obj_align(title, LV_ALIGN_CENTER, 0, 80);
+        lv_obj_align(title, LV_ALIGN_CENTER, 0, SCALE_PX(80));
         lv_label_set_text(title, "SAILDROP");
         lv_obj_set_style_text_color(title, lv_color_white(), 0);
-        lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(title, ui_scale::font_medium(), 0);
     }
 
     void load() {

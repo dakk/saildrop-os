@@ -18,6 +18,7 @@
 
 #include <lvgl.h>
 #include "../conf.h"
+#include "../scale.h"
 
 namespace gauge_styles {
 
@@ -52,31 +53,31 @@ inline void init_styles() {
     // Minor tick style
     lv_style_init(&style_tick_minor);
     lv_style_set_line_color(&style_tick_minor, COLOR_TICK);
-    lv_style_set_line_width(&style_tick_minor, 2);
-    lv_style_set_length(&style_tick_minor, 5);
+    lv_style_set_line_width(&style_tick_minor, SCALE_PX(2));
+    lv_style_set_length(&style_tick_minor, SCALE_PX(5));
 
     // Major tick style
     lv_style_init(&style_tick_major);
     lv_style_set_line_color(&style_tick_major, COLOR_TICK);
-    lv_style_set_line_width(&style_tick_major, 3);
-    lv_style_set_length(&style_tick_major, 10);
+    lv_style_set_line_width(&style_tick_major, SCALE_PX(3));
+    lv_style_set_length(&style_tick_major, SCALE_PX(10));
 
     // Needle style
     lv_style_init(&style_needle);
-    lv_style_set_line_width(&style_needle, 6);
+    lv_style_set_line_width(&style_needle, SCALE_PX(6));
     lv_style_set_line_rounded(&style_needle, true);
     lv_style_set_line_color(&style_needle, COLOR_TICK);
 
     // Value label style (large text)
     lv_style_init(&style_label_value);
     lv_style_set_text_color(&style_label_value, COLOR_TEXT);
-    lv_style_set_text_font(&style_label_value, &lv_font_montserrat_20);
+    lv_style_set_text_font(&style_label_value, ui_scale::font_medium());
     lv_style_set_text_align(&style_label_value, LV_TEXT_ALIGN_CENTER);
 
     // Small label style
     lv_style_init(&style_label_small);
     lv_style_set_text_color(&style_label_small, COLOR_TEXT);
-    lv_style_set_text_font(&style_label_small, &lv_font_montserrat_14);
+    lv_style_set_text_font(&style_label_small, ui_scale::font_small());
     lv_style_set_text_align(&style_label_small, LV_TEXT_ALIGN_CENTER);
 }
 

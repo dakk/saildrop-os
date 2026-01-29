@@ -18,6 +18,8 @@
 
 #include <lvgl.h>
 #include <string.h>
+#include "../conf.h"
+#include "../scale.h"
 
 class TimerGauge
 {
@@ -68,19 +70,20 @@ TimerGauge::TimerGauge(lv_obj_t *parent, int width, int height, int32_t secs = 6
     lv_obj_set_style_line_width(container, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *gauge_label = lv_label_create(container);
-    lv_obj_align(gauge_label, LV_ALIGN_CENTER, 0, -40);
+    lv_obj_align(gauge_label, LV_ALIGN_CENTER, 0, -SCALE_PX(40));
     lv_label_set_text(gauge_label, "TIMER");
+    lv_obj_set_style_text_font(gauge_label, ui_scale::font_small(), 0);
 
     // Add value label
     value_label = lv_label_create(container);
     lv_obj_align(value_label, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_text_font(value_label, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(value_label, ui_scale::font_large(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_label_set_text(value_label, "0:00");
 
     value_arc = lv_arc_create(container);
 
-    lv_obj_set_style_arc_width(value_arc, 20, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(value_arc, 20, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(value_arc, SCALE_PX(20), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(value_arc, SCALE_PX(20), LV_PART_INDICATOR);
     // lv_obj_set_style_arc_color(spinner, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
     lv_obj_set_style_arc_color(value_arc, lv_palette_darken(arc_color, 3), LV_PART_INDICATOR);
 
@@ -96,7 +99,7 @@ TimerGauge::TimerGauge(lv_obj_t *parent, int width, int height, int32_t secs = 6
 
     lv_obj_t *btn2 = lv_btn_create(container);
     // lv_obj_add_event_cb(btn2, event_handler, LV_EVENT_ALL, NULL);
-    lv_obj_align(btn2, LV_ALIGN_CENTER, 0, 40);
+    lv_obj_align(btn2, LV_ALIGN_CENTER, 0, SCALE_PX(40));
     lv_obj_add_flag(btn2, LV_OBJ_FLAG_CHECKABLE);
     lv_obj_set_height(btn2, LV_SIZE_CONTENT);
 

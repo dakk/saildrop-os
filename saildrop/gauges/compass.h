@@ -19,6 +19,7 @@
 #include <lvgl.h>
 #include "../utils.h"
 #include "../data.h"
+#include "../scale.h"
 #include "styles.h"
 
 class Compass {
@@ -57,7 +58,7 @@ private:
             // Highlight North tick
             if (line_dsc && base_dsc->id1 == 60) {
                 line_dsc->color = lv_palette_main(LV_PALETTE_RED);
-                line_dsc->width = 4;
+                line_dsc->width = SCALE_PX(4);
             }
         }
     }
@@ -71,7 +72,7 @@ public:
 
         // Compass scale
         scale = lv_scale_create(bg);
-        lv_obj_set_size(scale, width - 5, height - 5);
+        lv_obj_set_size(scale, width - SCALE_PX(5), height - SCALE_PX(5));
         lv_scale_set_mode(scale, LV_SCALE_MODE_ROUND_INNER);
         lv_obj_center(scale);
 
@@ -84,14 +85,14 @@ public:
         lv_scale_set_text_src(scale, labels);
 
         // Tick styling
-        lv_obj_set_style_length(scale, 4, LV_PART_ITEMS);
-        lv_obj_set_style_length(scale, 12, LV_PART_INDICATOR);
+        lv_obj_set_style_length(scale, SCALE_PX(4), LV_PART_ITEMS);
+        lv_obj_set_style_length(scale, SCALE_PX(12), LV_PART_INDICATOR);
         lv_obj_set_style_line_color(scale, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_ITEMS);
-        lv_obj_set_style_line_width(scale, 2, LV_PART_ITEMS);
+        lv_obj_set_style_line_width(scale, SCALE_PX(2), LV_PART_ITEMS);
         lv_obj_set_style_line_color(scale, lv_palette_lighten(LV_PALETTE_GREY, 1), LV_PART_INDICATOR);
-        lv_obj_set_style_line_width(scale, 3, LV_PART_INDICATOR);
+        lv_obj_set_style_line_width(scale, SCALE_PX(3), LV_PART_INDICATOR);
         lv_obj_set_style_text_color(scale, lv_palette_darken(LV_PALETTE_GREY, 1), LV_PART_INDICATOR);
-        lv_obj_set_style_text_font(scale, &lv_font_montserrat_14, LV_PART_INDICATOR);
+        lv_obj_set_style_text_font(scale, ui_scale::font_small(), LV_PART_INDICATOR);
 
         // Draw event for highlighting
         lv_obj_add_event_cb(scale, draw_event_cb, LV_EVENT_DRAW_TASK_ADDED, nullptr);
@@ -99,30 +100,30 @@ public:
 
         // North indicator (red triangle at top)
         lv_obj_t *north_marker = lv_label_create(bg);
-        lv_obj_align(north_marker, LV_ALIGN_TOP_MID, 0, 8);
+        lv_obj_align(north_marker, LV_ALIGN_TOP_MID, 0, SCALE_PX(8));
         lv_label_set_text(north_marker, LV_SYMBOL_DOWN);
         lv_obj_set_style_text_color(north_marker, lv_palette_main(LV_PALETTE_RED), 0);
-        lv_obj_set_style_text_font(north_marker, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(north_marker, ui_scale::font_medium(), 0);
 
         // Heading display (large number)
         heading_label = lv_label_create(bg);
-        lv_obj_align(heading_label, LV_ALIGN_CENTER, 0, 10);
+        lv_obj_align(heading_label, LV_ALIGN_CENTER, 0, SCALE_PX(10));
         lv_obj_set_style_text_color(heading_label, lv_color_white(), 0);
-        lv_obj_set_style_text_font(heading_label, &lv_font_montserrat_48, 0);
+        lv_obj_set_style_text_font(heading_label, ui_scale::font_large(), 0);
         lv_label_set_text(heading_label, "0");
 
         // Cardinal direction label
         cardinal_label = lv_label_create(bg);
-        lv_obj_align(cardinal_label, LV_ALIGN_CENTER, 0, 55);
+        lv_obj_align(cardinal_label, LV_ALIGN_CENTER, 0, SCALE_PX(55));
         lv_obj_set_style_text_color(cardinal_label, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
-        lv_obj_set_style_text_font(cardinal_label, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(cardinal_label, ui_scale::font_medium(), 0);
         lv_label_set_text(cardinal_label, "N");
 
         // Degree symbol
         lv_obj_t *degree = lv_label_create(bg);
-        lv_obj_align(degree, LV_ALIGN_CENTER, 45, -5);
+        lv_obj_align(degree, LV_ALIGN_CENTER, SCALE_PX(45), -SCALE_PX(5));
         lv_obj_set_style_text_color(degree, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
-        lv_obj_set_style_text_font(degree, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(degree, ui_scale::font_medium(), 0);
         lv_label_set_text(degree, "\xC2\xB0");  // UTF-8 degree symbol
 
         set_heading(0);

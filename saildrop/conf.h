@@ -20,6 +20,9 @@
 #define LVGL_TICK_PERIOD_MS 2
 #define LOOP_DELAY 2
 
+// Screen dimensions - modify these for different display sizes
+// The UI will scale automatically via scale.h
+// Examples: 240x240 (default), 128x128, 320x320, 480x480
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 240
 
