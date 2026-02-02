@@ -49,6 +49,9 @@
 #ifdef SCREEN_TIMER
 #include "screens/timerscreen.h"
 #endif
+#ifdef SCREEN_CHART
+#include "screens/chartscreen.h"
+#endif
 
 #define DRAW_BUF_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT  / 10 * (LV_COLOR_DEPTH / 8))
 uint32_t draw_buf[DRAW_BUF_SIZE / 4];
@@ -320,6 +323,9 @@ void setup()
         #endif
         #ifdef SCREEN_TIMER
         { SCREEN_TIMER, []() -> Screen* { return new TimerScreen(); } },
+        #endif
+        #ifdef SCREEN_CHART
+        { SCREEN_CHART, []() -> Screen* { return new ChartScreen(); } },
         #endif
     };
 

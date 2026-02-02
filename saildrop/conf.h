@@ -37,6 +37,10 @@
 #define SCREEN_AIS        5
 #define SCREEN_TACK       6
 // #define SCREEN_TIMER   7  // Not yet implemented
+#define SCREEN_CHART      8
+
+
+#define CHART_STREAM_PORT 2002
 
 // #define AP_MODE
 #define AP_SSID "SAILDROP_AP"
