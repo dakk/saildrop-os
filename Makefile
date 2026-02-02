@@ -16,7 +16,7 @@ BUILD_PROPERTY = --build-property build.flash_size=16MB \
 	--build-property build.psram=enabled
 # 	--build-property build.partitions=app3M_fat9M_16MB
 
-.PHONY: all compile upload monitor
+.PHONY: all compile upload monitor opencpn opencpn-install opencpn-clean
 
 all: compile upload monitor
 
@@ -36,3 +36,17 @@ upload:
 
 monitor:
 	arduino-cli monitor -p $(PORT) --config 115200
+
+# OpenCPN plugin
+OPENCPN_BUILD_DIR = opencpn_plugin/build
+
+opencpn:
+	@mkdir -p $(OPENCPN_BUILD_DIR)
+	cd $(OPENCPN_BUILD_DIR) && cmake .. -DCMAKE_BUILD_TYPE=Release
+	$(MAKE) -C $(OPENCPN_BUILD_DIR)
+
+opencpn-install: opencpn
+	$(MAKE) -C $(OPENCPN_BUILD_DIR) install
+
+opencpn-clean:
+	rm -rf $(OPENCPN_BUILD_DIR)

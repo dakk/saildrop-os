@@ -21,6 +21,9 @@
 #include "data.h"
 #include "settings.h"
 #include "ais.h"
+#ifdef SCREEN_CHART
+#include "chartstream.h"
+#endif
 
 String networks[32];
 uint8_t n_networks = 0;
@@ -277,6 +280,18 @@ void conn_loop() {
         // Station Mode: Connect to remote NMEA server
         conn_loop_client();
     }
+
+#ifdef SCREEN_CHART
+    // Chart streaming server
+    static bool chart_stream_started = false;
+    if (connected && !chart_stream_started) {
+        getChartStream()->begin();
+        chart_stream_started = true;
+    }
+    if (chart_stream_started) {
+        getChartStream()->loop();
+    }
+#endif
 }
 
 // Server mode loop (AP mode - listening for connections)

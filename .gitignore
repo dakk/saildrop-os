@@ -1,3 +1,6 @@
 *.zip
 ESP32-S3*
 SQEX
+
+# OpenCPN plugin build
+opencpn_plugin/build/
