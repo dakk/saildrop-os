@@ -20,24 +20,27 @@
 #include <string.h>
 #include "../conf.h"
 #include "../scale.h"
+#include "styles.h"
 
 class TimerGauge
 {
 private:
     bool started;
+    bool finished;
     lv_obj_t *value_label;
     lv_obj_t *btn_label;
     lv_obj_t *value_arc;
     int32_t remaining;
     int32_t seconds;
     lv_timer_t *timer;
+    lv_palette_t arc_color_orig;
 
 public:
     TimerGauge(lv_obj_t *parent, int width, int height, int32_t secs, lv_palette_t arc_color);
     ~TimerGauge();
     void tick_handler();
     void start_stop();
-    void reset(int32_t seconds);
+    void reset(int32_t seconds = -1);
     void showcase();
 
     void increase_secs();
@@ -50,6 +53,12 @@ void timer_gauge_tick_cb(lv_timer_t *timer)
     ((TimerGauge *) lv_timer_get_user_data(timer))->tick_handler();
 }
 
+void timer_gauge_btn_cb(lv_event_t *e)
+{
+    TimerGauge *gauge = (TimerGauge *) lv_event_get_user_data(e);
+    gauge->start_stop();
+}
+
 TimerGauge::~TimerGauge()
 {
     lv_timer_del(timer);
@@ -57,54 +66,63 @@ TimerGauge::~TimerGauge()
 
 TimerGauge::TimerGauge(lv_obj_t *parent, int width, int height, int32_t secs = 60 * 5, lv_palette_t arc_color = LV_PALETTE_BLUE)
 {
+    gauge_styles::init_styles();
+
     started = false;
+    finished = false;
     seconds = secs;
     remaining = secs;
+    arc_color_orig = arc_color;
 
-    lv_obj_t *container = lv_obj_create(parent);
-    lv_obj_set_size(container, width, height);
-    lv_obj_center(container);
-    // lv_obj_set_style_bg_color(container, lv_color_hex(0x000000), 0); // Navy blue background
-    lv_obj_set_style_border_width(container, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_outline_width(container, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_line_width(container, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // Background container
+    lv_obj_t *bg = gauge_styles::create_gauge_bg(parent, width, height);
 
-    lv_obj_t *gauge_label = lv_label_create(container);
-    lv_obj_align(gauge_label, LV_ALIGN_CENTER, 0, -SCALE_PX(40));
-    lv_label_set_text(gauge_label, "TIMER");
-    lv_obj_set_style_text_font(gauge_label, ui_scale::font_small(), 0);
-
-    // Add value label
-    value_label = lv_label_create(container);
-    lv_obj_align(value_label, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_text_font(value_label, ui_scale::font_large(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_label_set_text(value_label, "0:00");
-
-    value_arc = lv_arc_create(container);
-
-    lv_obj_set_style_arc_width(value_arc, SCALE_PX(20), LV_PART_MAIN);
-    lv_obj_set_style_arc_width(value_arc, SCALE_PX(20), LV_PART_INDICATOR);
-    // lv_obj_set_style_arc_color(spinner, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
-    lv_obj_set_style_arc_color(value_arc, lv_palette_darken(arc_color, 3), LV_PART_INDICATOR);
-
-    lv_obj_remove_style(value_arc, NULL, LV_PART_KNOB);  /*Be sure the knob is not displayed*/
-    lv_obj_clear_flag(value_arc, LV_OBJ_FLAG_CLICKABLE); /*To not allow adjusting by click*/
-
-    lv_arc_set_rotation(value_arc, 0);
-    lv_arc_set_bg_angles(value_arc, 0, 360);
-    lv_arc_set_start_angle(value_arc, 0);
-
-    lv_obj_set_size(value_arc, SCREEN_WIDTH, SCREEN_HEIGHT);
+    // Arc indicator (full circle for timer)
+    value_arc = lv_arc_create(bg);
+    lv_obj_set_size(value_arc, width - SCALE_PX(10), height - SCALE_PX(10));
     lv_obj_center(value_arc);
+    lv_arc_set_rotation(value_arc, 270);  // Start from top
+    lv_arc_set_bg_angles(value_arc, 0, 360);
+    lv_arc_set_value(value_arc, 100);
+    lv_obj_remove_style(value_arc, nullptr, LV_PART_KNOB);
+    lv_obj_remove_flag(value_arc, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_arc_width(value_arc, SCALE_PX(8), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(value_arc, lv_palette_darken(LV_PALETTE_GREY, 3), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(value_arc, SCALE_PX(8), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(value_arc, lv_palette_main(arc_color), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_rounded(value_arc, false, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(value_arc, false, LV_PART_INDICATOR);
 
-    lv_obj_t *btn2 = lv_btn_create(container);
-    // lv_obj_add_event_cb(btn2, event_handler, LV_EVENT_ALL, NULL);
-    lv_obj_align(btn2, LV_ALIGN_CENTER, 0, SCALE_PX(40));
-    lv_obj_add_flag(btn2, LV_OBJ_FLAG_CHECKABLE);
-    lv_obj_set_height(btn2, LV_SIZE_CONTENT);
+    // Title label
+    lv_obj_t *title = lv_label_create(bg);
+    lv_obj_align(title, LV_ALIGN_CENTER, 0, -SCALE_PX(50));
+    lv_label_set_text(title, "TIMER");
+    lv_obj_set_style_text_color(title, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
+    lv_obj_set_style_text_font(title, ui_scale::font_small(), 0);
 
-    btn_label = lv_label_create(btn2);
-    lv_label_set_text(btn_label, LV_SYMBOL_PLAY); // LV_SYMBOL_STOP
+    // Main value label (big digits)
+    value_label = lv_label_create(bg);
+    lv_obj_align(value_label, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_text_color(value_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(value_label, ui_scale::font_large(), 0);
+    lv_label_set_text(value_label, "5:00");
+
+    // Play/Stop button
+    lv_obj_t *btn = lv_obj_create(bg);
+    lv_obj_set_size(btn, SCALE_PX(50), SCALE_PX(30));
+    lv_obj_align(btn, LV_ALIGN_CENTER, 0, SCALE_PX(45));
+    lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_bg_color(btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(btn, SCALE_PX(5), LV_PART_MAIN);
+    lv_obj_set_style_border_width(btn, 0, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(btn, lv_palette_darken(LV_PALETTE_GREY, 1), LV_STATE_PRESSED);
+    lv_obj_add_event_cb(btn, timer_gauge_btn_cb, LV_EVENT_CLICKED, this);
+
+    btn_label = lv_label_create(btn);
+    lv_label_set_text(btn_label, LV_SYMBOL_PLAY);
+    lv_obj_set_style_text_color(btn_label, lv_color_white(), 0);
     lv_obj_center(btn_label);
 
     display_update();
@@ -113,10 +131,15 @@ TimerGauge::TimerGauge(lv_obj_t *parent, int width, int height, int32_t secs = 6
 
 void TimerGauge::increase_secs()
 {
-    if (started || seconds != remaining)
+    if (started)
         return;
-    // if (seconds == 60)
-    //     seconds = 60 * 5;
+
+    // Reset if finished or partially elapsed
+    if (finished || seconds != remaining)
+    {
+        reset();
+    }
+
     if (seconds == 60 * 5)
         seconds = 60 * 10;
 
@@ -126,12 +149,17 @@ void TimerGauge::increase_secs()
 
 void TimerGauge::decrese_secs()
 {
-    if (started || seconds != remaining)
+    if (started)
         return;
+
+    // Reset if finished or partially elapsed
+    if (finished || seconds != remaining)
+    {
+        reset();
+    }
+
     if (seconds == 60 * 10)
         seconds = 60 * 5;
-    // else if (seconds == 60 * 5)
-    //     seconds = 60;
 
     remaining = seconds;
     display_update();
@@ -144,7 +172,13 @@ void TimerGauge::tick_handler()
 
     if (remaining == 0)
     {
-        // TODO: Do some animation
+        if (!finished)
+        {
+            finished = true;
+            started = false;
+            lv_obj_set_style_arc_color(value_arc, lv_palette_main(LV_PALETTE_RED), LV_PART_INDICATOR);
+            lv_label_set_text(btn_label, LV_SYMBOL_REFRESH);
+        }
         return;
     }
 
@@ -153,9 +187,9 @@ void TimerGauge::tick_handler()
 }
 
 void TimerGauge::display_update() {
-    // 100 : seconds = x: elapsed
-    // x = elapsed * 100 / seconds
-    lv_arc_set_value(value_arc, 100 - ((seconds - remaining) * 100 / seconds));
+    // Arc shows remaining percentage (100 = full, 0 = empty)
+    int32_t arc_val = (remaining * 100) / seconds;
+    lv_arc_set_value(value_arc, arc_val);
 
     char buf[20];
     lv_snprintf(buf, sizeof(buf), "%d:%02d", remaining / 60, remaining % 60);
@@ -164,6 +198,12 @@ void TimerGauge::display_update() {
 
 void TimerGauge::start_stop()
 {
+    if (finished)
+    {
+        reset();
+        return;
+    }
+
     started = !started;
 
     if (started)
@@ -172,14 +212,18 @@ void TimerGauge::start_stop()
         lv_label_set_text(btn_label, LV_SYMBOL_PLAY);
 }
 
-void TimerGauge::reset(int32_t secs = -1)
+void TimerGauge::reset(int32_t secs)
 {
-    if (seconds != -1)
+    if (secs != -1)
     {
         seconds = secs;
     }
     remaining = seconds;
     started = false;
+    finished = false;
+    lv_obj_set_style_arc_color(value_arc, lv_palette_main(arc_color_orig), LV_PART_INDICATOR);
+    lv_label_set_text(btn_label, LV_SYMBOL_PLAY);
+    display_update();
 }
 
 void TimerGauge::showcase()

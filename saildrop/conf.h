@@ -36,7 +36,7 @@
 #define SCREEN_VALUES     4
 #define SCREEN_AIS        5
 #define SCREEN_TACK       6
-// #define SCREEN_TIMER   7  // Not yet implemented
+#define SCREEN_TIMER      7
 
 // #define AP_MODE
 #define AP_SSID "SAILDROP_AP"
