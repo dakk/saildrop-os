@@ -24,11 +24,11 @@
 
 // Include appropriate drivers based on board
 #if TOUCH_DRIVER_CST816S
-    #include "CST816S.h"
+    #include "drivers/CST816S.h"
 #endif
 
 #if TOUCH_DRIVER_GT911
-    #include "GT911.h"
+    #include "drivers/GT911.h"
 #endif
 
 #if DISPLAY_USE_TFT_ESPI
