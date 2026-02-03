@@ -171,14 +171,14 @@ private:
                             int canvas_x = screen_x + px;
                             if (canvas_x < 0 || canvas_x >= width) continue;
 
-                            // Read RGB565 pixel from tile (big-endian)
+                            // Read RGB565 pixel from tile (stored big-endian)
                             int tile_offset = (py * CHART_TILE_SIZE + px) * 2;
                             uint16_t pixel = (tile_data[tile_offset] << 8) | tile_data[tile_offset + 1];
 
-                            // Write to canvas buffer
+                            // Write to canvas buffer (little-endian for ESP32/LVGL)
                             int canvas_offset = (canvas_y * width + canvas_x) * 2;
-                            canvas_buf[canvas_offset] = pixel >> 8;
-                            canvas_buf[canvas_offset + 1] = pixel & 0xFF;
+                            canvas_buf[canvas_offset] = pixel & 0xFF;         // Low byte first
+                            canvas_buf[canvas_offset + 1] = pixel >> 8;       // High byte second
                         }
                     }
                 }
