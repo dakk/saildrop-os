@@ -15,6 +15,8 @@
  */
 // Include board configuration first (before LVGL)
 #include "conf.h"
+#include <Arduino.h>
+#include <esp_system.h>
 #include <lvgl.h>
 #include "hal.h"
 #include "conn.h"
@@ -258,20 +260,65 @@ void on_loading_completed()
 
 void setup()
 {
+    // Very early initialization - before any other code runs
     Serial.begin(115200);
+    delay(1000);  // Longer delay to catch serial output
+
+    Serial.println("\n\n========================================");
+    Serial.println("SaildropOS Early Boot");
+    Serial.println("========================================");
+    Serial.flush();
+
+    // Print reset reason
+    esp_reset_reason_t reason = esp_reset_reason();
+    Serial.printf("Reset reason: %d\n", reason);
+    Serial.flush();
+
+    // Check PSRAM
+    Serial.printf("PSRAM Size: %d bytes\n", ESP.getPsramSize());
+    Serial.printf("Free PSRAM: %d bytes\n", ESP.getFreePsram());
+    Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
+    Serial.flush();
+
+    // Check for safe boot mode (hold BOOT button during startup to clear settings)
+    // GPIO0 is the BOOT button on most ESP32-S3 boards
+    pinMode(0, INPUT_PULLUP);
+    delay(100);
+    if (digitalRead(0) == LOW) {
+        Serial.println("!!! SAFE BOOT: BOOT button held - clearing settings !!!");
+        Serial.flush();
+        getSettings()->begin();
+        getSettings()->clear();
+        Serial.println("Settings cleared. Release button and reboot.");
+        Serial.flush();
+        delay(3000);
+        ESP.restart();
+    }
+
     Serial.println("SaildropOS is booting.");
+    Serial.flush();
     Serial.printf("Board: %s (%dx%d)\n", BOARD_NAME, SCREEN_WIDTH, SCREEN_HEIGHT);
+    Serial.flush();
 
     String LVGL_Arduino = "LVGL: ";
     LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
 
     Serial.println(LVGL_Arduino);
+    Serial.flush();
 
     // Initialize settings
+    Serial.println("Loading settings...");
+    Serial.flush();
     getSettings()->begin();
     getSettings()->load();
+    Serial.println("Settings loaded.");
+    Serial.flush();
 
+    Serial.println("Initializing LVGL...");
+    Serial.flush();
     lv_init();
+    Serial.println("LVGL initialized.");
+    Serial.flush();
 #if LV_USE_LOG != 0
     lv_log_register_print_cb(my_print); /* register print function for debugging */
 #endif

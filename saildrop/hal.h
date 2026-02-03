@@ -84,7 +84,22 @@ public:
     int getScreenHeight() { return SCREEN_HEIGHT; }
 
 private:
-    HAL() : _initialized(false) {}
+    HAL() : _initialized(false)
+#if DISPLAY_USE_TFT_ESPI
+        , _tft(nullptr)
+#endif
+#if DISPLAY_DRIVER_RGB
+        , _bus(nullptr), _rgbpanel(nullptr), _gfx(nullptr)
+#endif
+#if TOUCH_DRIVER_CST816S
+        , _touch_cst816s(nullptr)
+#endif
+#if TOUCH_DRIVER_GT911
+        , _touch_gt911(nullptr)
+#endif
+    {
+        memset(&_lastTouch, 0, sizeof(_lastTouch));
+    }
 
     bool _initialized;
     HAL_TouchData _lastTouch;
@@ -116,36 +131,52 @@ bool HAL::begin() {
     if (_initialized) return true;
 
     Serial.printf("HAL: Initializing board %s\n", BOARD_NAME);
+    Serial.flush();
     Serial.printf("HAL: Screen %dx%d\n", SCREEN_WIDTH, SCREEN_HEIGHT);
+    Serial.flush();
 
 #if DISPLAY_USE_TFT_ESPI
     // Initialize TFT_eSPI display
+    Serial.println("HAL: Creating TFT_eSPI...");
+    Serial.flush();
     _tft = new TFT_eSPI(SCREEN_WIDTH, SCREEN_HEIGHT);
     _tft->begin();
     _tft->setRotation(0);
     Serial.println("HAL: TFT_eSPI display initialized");
+    Serial.flush();
 #endif
 
 #if DISPLAY_DRIVER_RGB
     // Initialize IO Expander for backlight and reset control
+    Serial.println("HAL: Initializing IO Expander...");
+    Serial.flush();
     initIOExpander();
+    Serial.println("HAL: IO Expander done. Initializing RGB display...");
+    Serial.flush();
     // Initialize RGB display via Arduino_GFX (handles ST7701 SPI init)
     initRGBDisplay();
     Serial.println("HAL: RGB display initialized");
+    Serial.flush();
 #endif
 
 #if TOUCH_DRIVER_CST816S
     // Initialize CST816S touch
+    Serial.println("HAL: Initializing CST816S touch...");
+    Serial.flush();
     _touch_cst816s = new CST816S(TOUCH_SDA_PIN, TOUCH_SCL_PIN, TOUCH_RST_PIN, TOUCH_INT_PIN);
     _touch_cst816s->begin();
     Serial.println("HAL: CST816S touch initialized");
+    Serial.flush();
 #endif
 
 #if TOUCH_DRIVER_GT911
     // Initialize GT911 touch
+    Serial.println("HAL: Initializing GT911 touch...");
+    Serial.flush();
     _touch_gt911 = new GT911(TOUCH_SDA_PIN, TOUCH_SCL_PIN, TOUCH_RST_PIN, TOUCH_INT_PIN);
     _touch_gt911->begin(&Wire);
     Serial.println("HAL: GT911 touch initialized");
+    Serial.flush();
 #endif
 
     _initialized = true;
@@ -176,25 +207,64 @@ lv_display_t* HAL::initDisplay(void* draw_buf, size_t buf_size) {
 
 void HAL::initIOExpander() {
     // IO expander uses same I2C bus as touch (pins 15, 7)
-    // Wire is already initialized in GT911 setup, but we do it here for safety
     Wire.begin(TOUCH_SDA_PIN, TOUCH_SCL_PIN);
+    Wire.setClock(100000);  // Use 100kHz for reliability during init
 
-    // Configure PCA9557 IO expander (address 0x24)
-    // Register 0x02: Polarity inversion - set to 0xFF (default)
-    Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
-    Wire.write(0x02);
-    Wire.write(0xFF);
-    Wire.endTransmission();
+    Serial.println("HAL: Configuring IO Expander...");
+    Serial.flush();
 
-    // Register 0x03: Configuration/Output - set to 0x3A
-    // This sets up backlight, resets, etc.
+    // PCA9557 IO Expander Pin mapping (Waveshare ESP32-S3-Touch-LCD-4):
+    // P0 (0x01): LCD backlight enable (high = on)
+    // P2 (0x04): LCD reset (active low)
+    // P4 (0x10): Touch reset (active low)
+    //
+    // Register 0x01: Output port register (actual pin values)
+    // Register 0x02: Polarity inversion
+    // Register 0x03: Configuration (0 = output, 1 = input)
+
+    // Step 1: Configure pins as outputs first
+    // 0x3A = 0b00111010 means P0, P2, P6, P7 are outputs (bits = 0)
     Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
-    Wire.write(0x03);
+    Wire.write(0x03);  // Configuration register
     Wire.write(0x3A);
     Wire.endTransmission();
+    delay(10);
 
-    delay(50);
-    Serial.println("HAL: IO Expander initialized");
+    // Step 2: Set polarity inversion (keep original Waveshare setting)
+    Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
+    Wire.write(0x02);
+    Wire.write(0xFF);  // Polarity inversion as per Waveshare reference
+    Wire.endTransmission();
+    delay(10);
+
+    // Step 3: Hardware reset sequence - CRITICAL for restart stability
+    // Assert LCD_RST (P2) LOW, backlight (P0) OFF
+    Serial.println("HAL: Asserting LCD reset...");
+    Serial.flush();
+    Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
+    Wire.write(0x01);  // Output port register
+    Wire.write(0x00);  // All outputs low (LCD reset active, backlight off)
+    Wire.endTransmission();
+    delay(50);  // Hold reset for 50ms
+
+    // Step 4: Release reset, keep backlight off initially
+    Serial.println("HAL: Releasing LCD reset...");
+    Serial.flush();
+    Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
+    Wire.write(0x01);
+    Wire.write(0x04);  // P2 high (LCD reset released), P0 low (backlight off)
+    Wire.endTransmission();
+    delay(120);  // ST7701 needs 120ms after reset before initialization
+
+    // Step 5: Enable backlight
+    Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
+    Wire.write(0x01);
+    Wire.write(0x05);  // P0 high (backlight on), P2 high (reset released)
+    Wire.endTransmission();
+    delay(20);
+
+    Serial.println("HAL: IO Expander initialized with reset sequence");
+    Serial.flush();
 }
 
 void HAL::initRGBDisplay() {
@@ -229,6 +299,13 @@ void HAL::initRGBDisplay() {
 void HAL::rgb_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
     HAL* hal_inst = (HAL*)lv_display_get_user_data(disp);
 
+    // Null check to prevent crash
+    if (hal_inst == nullptr || hal_inst->_gfx == nullptr) {
+        Serial.println("HAL: ERROR - flush_cb null pointer!");
+        lv_display_flush_ready(disp);
+        return;
+    }
+
     uint32_t w = (area->x2 - area->x1 + 1);
     uint32_t h = (area->y2 - area->y1 + 1);
 
@@ -243,13 +320,11 @@ void HAL::rgb_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_ma
 void HAL::setBacklight(uint8_t brightness) {
 #if DISPLAY_DRIVER_RGB
     // Control backlight via IO expander (PCA9557)
-    // The backlight is controlled via the configuration written in initIOExpander
-    // For now, backlight is always on after initialization
-    // To turn off, we'd need to modify the register 0x03 value
-    // 0x3A with backlight on, 0x3E would be off (assuming bit 2 controls BL)
+    // P0 = backlight, P2 = LCD reset (keep high)
+    // Register 0x01 is the output port register
     Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
-    Wire.write(0x03);
-    Wire.write(brightness > 0 ? 0x3A : 0x3E);
+    Wire.write(0x01);  // Output port register
+    Wire.write(brightness > 0 ? 0x05 : 0x04);  // P2 always high, P0 = backlight
     Wire.endTransmission();
 #endif
     // TFT_eSPI backlight control depends on hardware, usually via PWM pin

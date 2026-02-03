@@ -42,11 +42,16 @@ static void saveConfigCallback() {
 void saveAllParameters() {
     WifiPortal* portal = &portalInstance;
 
+    if (!portal->wm) {
+        Serial.println("ERROR: WiFiManager not initialized in saveAllParameters!");
+        return;
+    }
+
     Serial.println("Saving all parameters...");
 
     // Check if AP mode is enabled (checkbox returns "1" if checked)
-    bool apModeEnabled = portal->wm.server->hasArg("ap_mode") &&
-                         portal->wm.server->arg("ap_mode") == "1";
+    bool apModeEnabled = portal->wm->server->hasArg("ap_mode") &&
+                         portal->wm->server->arg("ap_mode") == "1";
     getSettings()->setApMode(apModeEnabled);
     Serial.printf("  AP Mode: %s\n", apModeEnabled ? "enabled" : "disabled");
 
@@ -69,8 +74,8 @@ void saveAllParameters() {
     }
 
     // Save listen protocol (AP mode)
-    if (portal->wm.server->hasArg("listen_proto")) {
-        int proto = atoi(portal->wm.server->arg("listen_proto").c_str());
+    if (portal->wm->server->hasArg("listen_proto")) {
+        int proto = atoi(portal->wm->server->arg("listen_proto").c_str());
         getSettings()->setListenProtocol(proto == 1 ? PROTO_UDP : PROTO_TCP);
         Serial.printf("  Listen Protocol: %s\n", proto == 1 ? "UDP" : "TCP");
     }
@@ -90,8 +95,8 @@ void saveAllParameters() {
     }
 
     // Save station mode protocol
-    if (portal->wm.server->hasArg("protocol")) {
-        int proto = atoi(portal->wm.server->arg("protocol").c_str());
+    if (portal->wm->server->hasArg("protocol")) {
+        int proto = atoi(portal->wm->server->arg("protocol").c_str());
         getSettings()->setProtocol(proto == 1 ? PROTO_UDP : PROTO_TCP);
         Serial.printf("  Protocol: %s\n", proto == 1 ? "UDP" : "TCP");
     }
@@ -109,7 +114,8 @@ WifiPortal* getPortal() {
 }
 
 WifiPortal::WifiPortal()
-    : paramNmeaIp(nullptr)
+    : wm(nullptr)  // Defer WiFiManager creation until begin()
+    , paramNmeaIp(nullptr)
     , paramNmeaPort(nullptr)
     , paramProtocol(nullptr)
     , paramApMode(nullptr)
@@ -123,6 +129,10 @@ WifiPortal::WifiPortal()
 
 WifiPortal::~WifiPortal() {
     cleanupParameters();
+    if (wm) {
+        delete wm;
+        wm = nullptr;
+    }
 }
 
 void WifiPortal::createParameters() {
@@ -247,61 +257,72 @@ void WifiPortal::cleanupParameters() {
 }
 
 void WifiPortal::begin() {
+    // Create WiFiManager instance if not already created
+    if (!wm) {
+        Serial.println("Creating WiFiManager instance...");
+        wm = new WiFiManager();
+    }
+
     // Create custom parameters
     createParameters();
 
     // Add AP mode parameters first (checkbox at top)
-    wm.addParameter(paramApMode);
-    wm.addParameter(paramApSsid);
-    wm.addParameter(paramApPass);
-    wm.addParameter(paramListenPort);
-    wm.addParameter(paramListenProtocol);
+    wm->addParameter(paramApMode);
+    wm->addParameter(paramApSsid);
+    wm->addParameter(paramApPass);
+    wm->addParameter(paramListenPort);
+    wm->addParameter(paramListenProtocol);
 
     // Add station mode parameters
-    wm.addParameter(paramNmeaIp);
-    wm.addParameter(paramNmeaPort);
-    wm.addParameter(paramProtocol);
+    wm->addParameter(paramNmeaIp);
+    wm->addParameter(paramNmeaPort);
+    wm->addParameter(paramProtocol);
 
     // Set save config callback
-    wm.setSaveConfigCallback(saveConfigCallback);
+    wm->setSaveConfigCallback(saveConfigCallback);
 
     // Break after config save even if WiFi connection fails
     // This is needed for AP mode where we don't connect to any WiFi
-    wm.setBreakAfterConfig(true);
+    wm->setBreakAfterConfig(true);
 
     // Configure portal timeout
-    wm.setConfigPortalTimeout(PORTAL_TIMEOUT_SEC);
+    wm->setConfigPortalTimeout(PORTAL_TIMEOUT_SEC);
 
     // Set AP callback for when portal starts
-    wm.setAPCallback([](WiFiManager* wm) {
+    wm->setAPCallback([](WiFiManager* wmgr) {
         Serial.println("WiFiManager: Portal started");
         Serial.printf("  AP SSID: %s\n", PORTAL_SSID);
         Serial.printf("  AP IP: %s\n", WiFi.softAPIP().toString().c_str());
     });
 
     // Set minimum signal quality
-    wm.setMinimumSignalQuality(20);
+    wm->setMinimumSignalQuality(20);
 
     // Don't show the saved networks in the scan
-    wm.setRemoveDuplicateAPs(true);
+    wm->setRemoveDuplicateAPs(true);
 
     Serial.println("WiFiManager initialized");
 }
 
 bool WifiPortal::startPortal() {
+    if (!wm) {
+        Serial.println("ERROR: WiFiManager not initialized!");
+        return false;
+    }
+
     status = PORTAL_RUNNING;
 
     Serial.println("Starting WiFi configuration portal...");
 
     // Start the configuration portal (blocking)
-    bool success = wm.startConfigPortal(PORTAL_SSID, PORTAL_PASS);
+    bool success = wm->startConfigPortal(PORTAL_SSID, PORTAL_PASS);
 
     if (success) {
         status = PORTAL_SUCCESS;
         Serial.println("WiFiManager: Configuration successful");
 
         // Check if AP mode is enabled (checkbox returns "1" if checked)
-        bool apModeEnabled = wm.server->hasArg("ap_mode") && wm.server->arg("ap_mode") == "1";
+        bool apModeEnabled = wm->server->hasArg("ap_mode") && wm->server->arg("ap_mode") == "1";
         getSettings()->setApMode(apModeEnabled);
         Serial.printf("  AP Mode: %s\n", apModeEnabled ? "enabled" : "disabled");
 
@@ -324,8 +345,8 @@ bool WifiPortal::startPortal() {
         }
 
         // Save listen protocol (AP mode)
-        if (wm.server->hasArg("listen_proto")) {
-            int proto = atoi(wm.server->arg("listen_proto").c_str());
+        if (wm->server->hasArg("listen_proto")) {
+            int proto = atoi(wm->server->arg("listen_proto").c_str());
             getSettings()->setListenProtocol(proto == 1 ? PROTO_UDP : PROTO_TCP);
             Serial.printf("  Listen Protocol: %s\n", proto == 1 ? "UDP" : "TCP");
         }
@@ -345,8 +366,8 @@ bool WifiPortal::startPortal() {
         }
 
         // Save station mode protocol
-        if (wm.server->hasArg("protocol")) {
-            int proto = atoi(wm.server->arg("protocol").c_str());
+        if (wm->server->hasArg("protocol")) {
+            int proto = atoi(wm->server->arg("protocol").c_str());
             getSettings()->setProtocol(proto == 1 ? PROTO_UDP : PROTO_TCP);
             Serial.printf("  Protocol: %s\n", proto == 1 ? "UDP" : "TCP");
         }
@@ -367,12 +388,17 @@ bool WifiPortal::startPortal() {
 }
 
 bool WifiPortal::autoConnect() {
+    if (!wm) {
+        Serial.println("ERROR: WiFiManager not initialized!");
+        return false;
+    }
+
     status = PORTAL_RUNNING;
 
     Serial.println("WiFiManager: Attempting auto-connect...");
 
     // autoConnect tries saved credentials first, then starts portal if fail
-    bool success = wm.autoConnect(PORTAL_SSID, PORTAL_PASS);
+    bool success = wm->autoConnect(PORTAL_SSID, PORTAL_PASS);
 
     if (success) {
         status = PORTAL_SUCCESS;
@@ -408,6 +434,8 @@ PortalStatus WifiPortal::getStatus() {
 }
 
 void WifiPortal::resetSettings() {
-    wm.resetSettings();
-    Serial.println("WiFiManager: Settings reset");
+    if (wm) {
+        wm->resetSettings();
+        Serial.println("WiFiManager: Settings reset");
+    }
 }

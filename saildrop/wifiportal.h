@@ -16,6 +16,7 @@
 #ifndef WIFIPORTAL_H
 #define WIFIPORTAL_H
 
+#include <LittleFS.h>
 #include <WiFiManager.h>
 #include "conf.h"
 
@@ -45,7 +46,7 @@ class WifiPortal {
     friend void saveAllParameters();
 
 private:
-    WiFiManager wm;
+    WiFiManager* wm;  // Pointer to defer initialization until begin()
     // Station mode parameters
     WiFiManagerParameter* paramNmeaIp;
     WiFiManagerParameter* paramNmeaPort;

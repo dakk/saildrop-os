@@ -9,6 +9,7 @@ PORT = /dev/ttyACM0
 PROJECT_DIR = saildrop
 JOBS ?= $(shell nproc)
 BOARD_CONFIG = $(PROJECT_DIR)/board_config.h
+ESPTOOL = ~/.arduino15/packages/esp32/tools/esptool_py/5.1.0/esptool
 
 # Board selection: lcd128 (default) or lcd4
 # Usage: make compile BOARD=lcd4
@@ -36,7 +37,7 @@ else
     $(error Unknown BOARD type: $(BOARD). Use lcd128 or lcd4)
 endif
 
-.PHONY: all compile upload monitor clean info install-prereq install-prereq-lcd4 set-board
+.PHONY: all compile upload monitor clean info install-prereq install-prereq-lcd4 set-board reset erase-nvs erase-flash
 
 # Default target - compile for 1.28" LCD
 all: compile upload monitor
@@ -106,6 +107,21 @@ clean:
 	rm -rf $(PROJECT_DIR)/build
 	rm -rf ~/Arduino/libraries/lvgl/src/lv_conf.h
 
+# Reset settings (erase NVS partition only)
+# NVS partition is at 0x9000 with size 0x6000 (24KB)
+reset: erase-nvs
+
+erase-nvs:
+	@echo "Erasing NVS partition (settings will be cleared)..."
+	$(ESPTOOL) --port $(PORT) erase_region 0x9000 0x6000
+	@echo "NVS erased. Device will boot in portal mode."
+
+# Erase entire flash (factory reset)
+erase-flash:
+	@echo "Erasing entire flash..."
+	$(ESPTOOL) --port $(PORT) erase_flash
+	@echo "Flash erased. Re-upload firmware with 'make upload'"
+
 # Full build cycle for 1.28" LCD
 build-lcd128: compile-lcd128 upload monitor
 
@@ -134,6 +150,8 @@ help:
 	@echo "  make install-prereq        - Install dependencies for 1.28\" LCD"
 	@echo "  make install-prereq-lcd4   - Install dependencies for 4\" LCD"
 	@echo "  make clean                 - Clean build artifacts"
+	@echo "  make reset                 - Reset settings (erase NVS, boot to portal)"
+	@echo "  make erase-flash           - Erase entire flash (factory reset)"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make build-lcd128          # Build and upload for 1.28\" display"

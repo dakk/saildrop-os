@@ -50,8 +50,9 @@ public:
     MultiScreen(uint8_t ns)
     {
         num_screens = ns;
+        current_screen = 0;
 
-        for (int j; j < num_screens; j++)
+        for (int j = 0; j < num_screens; j++)
         {
             screens[j] = default_screen_create();
         }
