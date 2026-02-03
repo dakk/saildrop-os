@@ -89,13 +89,21 @@ inline const lv_font_t* get_font(FontSize size) {
         case FONT_LARGE:  return &lv_font_montserrat_48;
         default:          return &lv_font_montserrat_18;
     }
-#else
-    // Very large screens (400px+)
+#elif SCREEN_MIN_DIM <= 520
+    // 480px screens (401-520px) - ESP32-S3-Touch-LCD-4
     switch (size) {
         case FONT_SMALL:  return &lv_font_montserrat_22;
         case FONT_MEDIUM: return &lv_font_montserrat_32;
         case FONT_LARGE:  return &lv_font_montserrat_48;
         default:          return &lv_font_montserrat_22;
+    }
+#else
+    // Very large screens (520px+)
+    switch (size) {
+        case FONT_SMALL:  return &lv_font_montserrat_24;
+        case FONT_MEDIUM: return &lv_font_montserrat_36;
+        case FONT_LARGE:  return &lv_font_montserrat_48;
+        default:          return &lv_font_montserrat_24;
     }
 #endif
 }

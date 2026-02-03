@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <lvgl.h>
-#include <TFT_eSPI.h>
-#include "lv_conf.h"
-#include "CST816S.h"
-#include "conn.h"
+// Include board configuration first (before LVGL)
 #include "conf.h"
+#include <lvgl.h>
+#include "hal.h"
+#include "conn.h"
 #include "settings.h"
 #include "wifiportal.h"
 
@@ -50,8 +49,17 @@
 #include "screens/timerscreen.h"
 #endif
 
-#define DRAW_BUF_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT  / 10 * (LV_COLOR_DEPTH / 8))
-uint32_t draw_buf[DRAW_BUF_SIZE / 4];
+// Draw buffer - size defined by board configuration
+// For RGB displays with PSRAM, allocate in PSRAM for larger buffer
+#if USE_PSRAM_BUFFER && defined(BOARD_LCD_4)
+    // Allocate from PSRAM for 4" display (larger buffer needed)
+    static uint8_t* draw_buf = nullptr;
+    #define DRAW_BUF_ALLOC_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
+#else
+    // Static allocation for SPI displays
+    #define DRAW_BUF_ALLOC_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
+    static uint32_t draw_buf[DRAW_BUF_ALLOC_SIZE / 4];
+#endif
 
 static Screen *screens[16];
 int current_screen = 0;
@@ -63,9 +71,6 @@ void add_screen(Screen *sc) {
     screens[num_screens] = sc;
     num_screens ++;
 }
-
-TFT_eSPI tft = TFT_eSPI(SCREEN_WIDTH, SCREEN_HEIGHT); /* TFT instance */
-CST816S touch(6, 7, 13, 5);                         // sda, scl, rst, irq
 
 TaskHandle_t core2_loop_task;
 
@@ -181,30 +186,31 @@ void on_tick(void *arg)
     lv_tick_inc(LVGL_TICK_PERIOD_MS);
 }
 
-/*Read the touchpad*/
+/*Read the touchpad - uses HAL for hardware abstraction*/
 void my_touchpad_read( lv_indev_t * indev, lv_indev_data_t * data )
 {
-    bool touched = touch.available();
+    bool touched = hal().touchAvailable();
     if (!touched)
     {
         data->state = LV_INDEV_STATE_REL;
     }
     else
     {
+        HAL_TouchData touchData = hal().getTouchData();
         data->state = LV_INDEV_STATE_PR;
-        data->point.x = touch.data.x;
-        data->point.y = touch.data.y;
+        data->point.x = touchData.x;
+        data->point.y = touchData.y;
 
         Serial.printf("Gesture: %s, ID: %d, x: %d, y: %d, status: %d, tick: %lu, last: %lu\n",
-                      touch.gesture(), touch.data.gestureID, touch.data.x, touch.data.y, status, tick, last_handled_gesture_tick);
+                      hal().getGestureName().c_str(), touchData.gestureID, touchData.x, touchData.y, status, tick, last_handled_gesture_tick);
 
         if (status != RUNNING || (tick - last_handled_gesture_tick) < 50)
             return;
 
-        Serial.printf("Handling gesture ID: %d\n", touch.data.gestureID);
+        Serial.printf("Handling gesture ID: %d\n", touchData.gestureID);
 
         // Handle long press globally (works even when context menu is visible)
-        if (touch.data.gestureID == LONG_PRESS)
+        if (touchData.gestureID == HAL_GESTURE_LONG_PRESS)
         {
             if (!context_menu_is_visible()) {
                 context_menu_show(screens[current_screen]->scr);
@@ -219,24 +225,24 @@ void my_touchpad_read( lv_indev_t * indev, lv_indev_data_t * data )
             return;
         }
 
-        if (touch.data.gestureID == SWIPE_LEFT)
+        if (touchData.gestureID == HAL_GESTURE_SWIPE_LEFT)
         {
             current_screen = (current_screen + num_screens - 1) % num_screens;
             lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, 100, 0, false);
             last_handled_gesture_tick = tick;
         }
-        else if (touch.data.gestureID == SWIPE_RIGHT)
+        else if (touchData.gestureID == HAL_GESTURE_SWIPE_RIGHT)
         {
             current_screen = (current_screen + 1) % num_screens;
             lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 100, 0, false);
             last_handled_gesture_tick = tick;
         }
-        else if (touch.data.gestureID == SWIPE_UP)
+        else if (touchData.gestureID == HAL_GESTURE_SWIPE_UP)
         {
             screens[current_screen]->on_swipe_up();
             last_handled_gesture_tick = tick;
         }
-        else if (touch.data.gestureID == SWIPE_DOWN)
+        else if (touchData.gestureID == HAL_GESTURE_SWIPE_DOWN)
         {
             screens[current_screen]->on_swipe_down();
             last_handled_gesture_tick = tick;
@@ -254,14 +260,12 @@ void setup()
 {
     Serial.begin(115200);
     Serial.println("SaildropOS is booting.");
+    Serial.printf("Board: %s (%dx%d)\n", BOARD_NAME, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     String LVGL_Arduino = "LVGL: ";
     LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
 
     Serial.println(LVGL_Arduino);
-
-    // Initialize touch
-    touch.begin();
 
     // Initialize settings
     getSettings()->begin();
@@ -272,23 +276,25 @@ void setup()
     lv_log_register_print_cb(my_print); /* register print function for debugging */
 #endif
 
-    tft.begin();        /* TFT init */
-    tft.setRotation(0); /* Landscape orientation, flipped */
+    // Initialize Hardware Abstraction Layer (display + touch)
+    hal().begin();
 
-    /*Set the touchscreen calibration data,
-     the actual data for your display can be acquired using
-     the Generic -> Touch_calibrate example from the TFT_eSPI library*/
-    // uint16_t calData[5] = { 275, 3620, 264, 3532, 1 };
-    // tft.setTouch( calData );
+    Serial.println("HAL initialized");
 
-    Serial.println("Touch and TFT initialized");
+#if USE_PSRAM_BUFFER && defined(BOARD_LCD_4)
+    // Allocate draw buffer from PSRAM for 4" display
+    draw_buf = (uint8_t*)heap_caps_malloc(DRAW_BUF_ALLOC_SIZE, MALLOC_CAP_SPIRAM);
+    if (draw_buf == nullptr) {
+        Serial.println("ERROR: Failed to allocate draw buffer from PSRAM!");
+        // Fallback to internal RAM with smaller buffer
+        draw_buf = (uint8_t*)malloc(SCREEN_WIDTH * SCREEN_HEIGHT / 20 * (LV_COLOR_DEPTH / 8));
+    }
+#endif
 
-    lv_display_t * disp;
-    /*TFT_eSPI can be enabled lv_conf.h to initialize the display in a simple way*/
-    disp = lv_tft_espi_create(SCREEN_WIDTH, SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
-    lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_0);
+    // Initialize display using HAL
+    lv_display_t * disp = hal().initDisplay(draw_buf, DRAW_BUF_ALLOC_SIZE);
 
-    /*Initialize the (dummy) input device driver*/
+    /*Initialize the input device driver*/
     lv_indev_t *indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); /*Touchpad should have POINTER type*/
     lv_indev_set_read_cb(indev, my_touchpad_read);
