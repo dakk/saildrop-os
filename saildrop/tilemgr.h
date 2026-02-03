@@ -87,7 +87,7 @@ private:
     // Build file path for tile
     void build_tile_path(uint8_t zoom, uint32_t tile_x, uint32_t tile_y) {
         snprintf(tile_path, sizeof(tile_path),
-                 "/sdcard/tiles/%d/%lu/%lu.bin",
+                 "/tiles/%d/%lu/%lu.bin",
                  zoom, (unsigned long)tile_x, (unsigned long)tile_y);
     }
 
@@ -249,7 +249,7 @@ public:
     // Check if tiles directory exists for a zoom level
     bool has_zoom_level(uint8_t zoom) {
         char path[32];
-        snprintf(path, sizeof(path), "/sdcard/tiles/%d", zoom);
+        snprintf(path, sizeof(path), "/tiles/%d", zoom);
         return SD_MMC.exists(path);
     }
 
