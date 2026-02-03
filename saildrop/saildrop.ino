@@ -235,13 +235,16 @@ void my_touchpad_read( lv_indev_t * indev, lv_indev_data_t * data )
         if (touchData.gestureID == HAL_GESTURE_SWIPE_LEFT)
         {
             current_screen = (current_screen + num_screens - 1) % num_screens;
-            lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, 100, 0, false);
+            // Use fade animation instead of slide to avoid display tearing on RGB displays
+            // Slide animations require rendering two screens simultaneously which causes issues
+            lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_FADE_IN, 150, 0, false);
             last_handled_gesture_tick = tick;
         }
         else if (touchData.gestureID == HAL_GESTURE_SWIPE_RIGHT)
         {
             current_screen = (current_screen + 1) % num_screens;
-            lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 100, 0, false);
+            // Use fade animation instead of slide to avoid display tearing on RGB displays
+            lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_FADE_IN, 150, 0, false);
             last_handled_gesture_tick = tick;
         }
         else if (touchData.gestureID == HAL_GESTURE_SWIPE_UP)
