@@ -42,9 +42,14 @@ inline void init_styles() {
     if (styles_initialized) return;
     styles_initialized = true;
 
-    // Background style (circular gauge container)
+    // Background style (gauge container)
+    // Use circular radius only for round displays, small corner radius for square displays
     lv_style_init(&style_bg);
+#if DISPLAY_IS_ROUND
     lv_style_set_radius(&style_bg, LV_RADIUS_CIRCLE);
+#else
+    lv_style_set_radius(&style_bg, SCALE_PX(10));  // Small corner radius for square displays
+#endif
     lv_style_set_bg_color(&style_bg, color_bg());
     lv_style_set_bg_opa(&style_bg, LV_OPA_COVER);
     lv_style_set_pad_all(&style_bg, 0);

@@ -30,6 +30,9 @@
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 240
 
+// Display shape (0 = rectangular/square, 1 = circular/round)
+#define DISPLAY_IS_ROUND 1
+
 // Display configuration
 #define DISPLAY_DRIVER_SPI      1
 #define DISPLAY_DRIVER_RGB      0

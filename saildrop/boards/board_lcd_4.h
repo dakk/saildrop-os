@@ -31,6 +31,9 @@
 #define SCREEN_WIDTH  480
 #define SCREEN_HEIGHT 480
 
+// Display shape (0 = rectangular/square, 1 = circular/round)
+#define DISPLAY_IS_ROUND 0
+
 // Display configuration
 #define DISPLAY_DRIVER_SPI      0
 #define DISPLAY_DRIVER_RGB      1

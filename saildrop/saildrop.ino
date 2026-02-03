@@ -336,6 +336,10 @@ void setup()
         // Fallback to internal RAM with smaller buffer
         draw_buf = (uint8_t*)malloc(SCREEN_WIDTH * SCREEN_HEIGHT / 20 * (LV_COLOR_DEPTH / 8));
     }
+    // IMPORTANT: Zero the buffer to prevent garbage pixels in corners
+    if (draw_buf != nullptr) {
+        memset(draw_buf, 0, DRAW_BUF_ALLOC_SIZE);
+    }
 #endif
 
     // Initialize display using HAL
@@ -411,6 +415,11 @@ void setup()
         status = BOOT;
         lv_disp_load_scr(splash->scr);
     }
+
+    // Force full screen refresh to clear any garbage in corners
+    // This is needed for RGB displays with partial rendering mode
+    lv_obj_invalidate(lv_scr_act());
+    lv_refr_now(NULL);
 
     // Setup timers
     const esp_timer_create_args_t lvgl_tick_timer_args = {
