@@ -47,8 +47,8 @@
 #define SCREEN_WIND       2
 #define SCREEN_COMPASS    3
 #define SCREEN_AIS        4
-#define SCREEN_TACK       5
-#define SCREEN_TIMER      6
+#define SCREEN_TIMER      5
+// #define SCREEN_TACK       5
 
 // #define AP_MODE
 #define AP_SSID "SAILDROP_AP"
