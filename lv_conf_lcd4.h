@@ -69,12 +69,8 @@
 
 #if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN
     /** Size of memory available for `lv_malloc()` in bytes (>= 2kB) */
-    /* Larger displays need more memory - adjust based on LV_MEM_SIZE_KB from board config if defined */
-    #ifdef LV_MEM_SIZE_KB
-        #define LV_MEM_SIZE (LV_MEM_SIZE_KB * 1024U)
-    #else
-        #define LV_MEM_SIZE (64 * 1024U)          /**< [bytes] */
-    #endif
+    /* 128KB for ESP32-S3-Touch-LCD-4 (480x480 display) */
+    #define LV_MEM_SIZE (128 * 1024U)          /**< [bytes] */
 
     /** Size of the memory expand for `lv_malloc()` in bytes */
     #define LV_MEM_POOL_EXPAND_SIZE 0
@@ -97,11 +93,8 @@
 
 /** Default Dots Per Inch. Used to initialize default sizes such as widgets sized, style paddings.
  * (Not so important, you can adjust it to modify default sizes and spaces.) */
-#ifdef DISPLAY_DPI
-    #define LV_DPI_DEF DISPLAY_DPI
-#else
-    #define LV_DPI_DEF 130              /**< [px/inch] */
-#endif
+/* 150 DPI for ESP32-S3-Touch-LCD-4 (4" 480x480 display) */
+#define LV_DPI_DEF 150              /**< [px/inch] */
 
 /*=================
  * OPERATING SYSTEM
@@ -746,7 +739,7 @@
 
 #define LV_USE_DROPDOWN   0   /**< Requires: lv_label */
 
-#define LV_USE_IMAGE      0   /**< Requires: lv_label */
+#define LV_USE_IMAGE      1   /**< Requires: lv_label */
 
 #define LV_USE_IMAGEBUTTON     0
 
@@ -1257,13 +1250,9 @@
     #define LV_LINUX_DRM_GBM_BUFFERS 0
 #endif
 
-/** Interface for TFT_eSPI - only used for SPI displays (1.28" round LCD)
- *  RGB displays (4" LCD) use esp_lcd_panel directly */
-#ifdef DISPLAY_USE_TFT_ESPI
-    #define LV_USE_TFT_ESPI     DISPLAY_USE_TFT_ESPI
-#else
-    #define LV_USE_TFT_ESPI     1  /* Default for backwards compatibility */
-#endif
+/** Interface for TFT_eSPI - disabled for 4" LCD (uses RGB parallel interface)
+ *  This config is for ESP32-S3-Touch-LCD-4 */
+#define LV_USE_TFT_ESPI     0
 
 /** Driver for evdev input devices */
 #define LV_USE_EVDEV    0

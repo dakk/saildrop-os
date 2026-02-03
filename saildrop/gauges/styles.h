@@ -22,11 +22,11 @@
 
 namespace gauge_styles {
 
-// Color definitions
-static const lv_color_t COLOR_BG = lv_palette_darken(LV_PALETTE_GREY, 4);
-static const lv_color_t COLOR_TICK = lv_palette_darken(LV_PALETTE_GREY, 1);
-static const lv_color_t COLOR_ACCENT = lv_palette_main(LV_PALETTE_RED);
-static const lv_color_t COLOR_TEXT = lv_color_white();
+// Color accessor functions (must be called AFTER lv_init())
+inline lv_color_t color_bg() { return lv_palette_darken(LV_PALETTE_GREY, 4); }
+inline lv_color_t color_tick() { return lv_palette_darken(LV_PALETTE_GREY, 1); }
+inline lv_color_t color_accent() { return lv_palette_main(LV_PALETTE_RED); }
+inline lv_color_t color_text() { return lv_color_white(); }
 
 // Style instances
 static lv_style_t style_bg;
@@ -42,23 +42,27 @@ inline void init_styles() {
     if (styles_initialized) return;
     styles_initialized = true;
 
-    // Background style (circular gauge container)
+    // Background style (gauge container)
     lv_style_init(&style_bg);
+#if DISPLAY_IS_ROUND
     lv_style_set_radius(&style_bg, LV_RADIUS_CIRCLE);
-    lv_style_set_bg_color(&style_bg, COLOR_BG);
+#else
+    lv_style_set_radius(&style_bg, 0);  // No rounded corners for square displays
+#endif
+    lv_style_set_bg_color(&style_bg, color_bg());
     lv_style_set_bg_opa(&style_bg, LV_OPA_COVER);
     lv_style_set_pad_all(&style_bg, 0);
     lv_style_set_border_width(&style_bg, 0);
 
     // Minor tick style
     lv_style_init(&style_tick_minor);
-    lv_style_set_line_color(&style_tick_minor, COLOR_TICK);
+    lv_style_set_line_color(&style_tick_minor, color_tick());
     lv_style_set_line_width(&style_tick_minor, SCALE_PX(2));
     lv_style_set_length(&style_tick_minor, SCALE_PX(5));
 
     // Major tick style
     lv_style_init(&style_tick_major);
-    lv_style_set_line_color(&style_tick_major, COLOR_TICK);
+    lv_style_set_line_color(&style_tick_major, color_tick());
     lv_style_set_line_width(&style_tick_major, SCALE_PX(3));
     lv_style_set_length(&style_tick_major, SCALE_PX(10));
 
@@ -66,17 +70,17 @@ inline void init_styles() {
     lv_style_init(&style_needle);
     lv_style_set_line_width(&style_needle, SCALE_PX(6));
     lv_style_set_line_rounded(&style_needle, true);
-    lv_style_set_line_color(&style_needle, COLOR_TICK);
+    lv_style_set_line_color(&style_needle, color_tick());
 
     // Value label style (large text)
     lv_style_init(&style_label_value);
-    lv_style_set_text_color(&style_label_value, COLOR_TEXT);
+    lv_style_set_text_color(&style_label_value, color_text());
     lv_style_set_text_font(&style_label_value, ui_scale::font_medium());
     lv_style_set_text_align(&style_label_value, LV_TEXT_ALIGN_CENTER);
 
     // Small label style
     lv_style_init(&style_label_small);
-    lv_style_set_text_color(&style_label_small, COLOR_TEXT);
+    lv_style_set_text_color(&style_label_small, color_text());
     lv_style_set_text_font(&style_label_small, ui_scale::font_small());
     lv_style_set_text_align(&style_label_small, LV_TEXT_ALIGN_CENTER);
 }

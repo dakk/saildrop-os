@@ -6,11 +6,11 @@ Saildrop-OS is an embedded operating system for sailing instruments running on E
 
 ## Technology Stack
 
-- **Hardware**: Waveshare ESP32-S3 with 1.28" touch LCD
+- **Hardware**: Waveshare ESP32-S3 displays (1.28" round LCD, 4" square LCD)
 - **Framework**: Arduino (arduino-cli)
 - **UI Library**: LVGL v9.3.0
-- **Display Driver**: TFT_eSPI
-- **Touch Controller**: CST816S (capacitive, I2C)
+- **Display Drivers**: TFT_eSPI (SPI), Arduino_GFX (RGB parallel)
+- **Touch Controllers**: CST816S, GT911 (capacitive, I2C)
 - **NMEA Parsing**: MicroNMEA
 - **Language**: C/C++ (Arduino sketch + header-only libraries)
 - **Build**: Makefile with arduino-cli
@@ -23,10 +23,19 @@ saildrop-os/
 ├── saildrop/                   # Main application
 │   ├── saildrop.ino           # Entry point - init, main loop, gesture handling
 │   ├── conf.h                 # Configuration macros (WiFi, display, debug)
+│   ├── hal.h                  # Hardware abstraction layer for display/touch
+│   ├── scale.h                # UI scaling utilities for multi-resolution support
 │   ├── data.h/cpp             # Global NMEA data singleton (sog, hdg, wind values)
 │   ├── conn.h/cpp             # WiFi + TCP connection, NMEA parsing
-│   ├── CST816S.h/cpp          # Touch controller driver
 │   ├── utils.h                # Utilities (heading to cardinal conversion)
+│   ├── boards/                # Board-specific configurations
+│   │   ├── boards.h           # Board selection header
+│   │   ├── board_lcd_128.h    # Waveshare 1.28" round LCD (240x240)
+│   │   └── board_lcd_4.h      # Waveshare 4" square LCD (480x480)
+│   ├── drivers/               # Hardware drivers
+│   │   ├── CST816S.h          # CST816S touch controller driver
+│   │   ├── CTS816S.cpp        # CST816S implementation
+│   │   └── GT911.h            # GT911 touch controller driver (header-only)
 │   ├── screens/               # Screen implementations
 │   │   ├── screen.h           # Base Screen & MultiScreen classes
 │   │   ├── splashscreen.h     # Loading screen
@@ -34,6 +43,7 @@ saildrop-os/
 │   │   ├── compassscreen.h    # Compass display
 │   │   └── valuesscreen.h     # Multi-value carousel (depth, SOG, HDG)
 │   └── gauges/                # Reusable gauge widgets
+│       ├── styles.h           # Shared gauge styles
 │       ├── speedgauge.h       # Circular speed gauge with needle
 │       ├── compass.h          # 360° compass rose
 │       ├── valuegauge.h       # Generic value with arc indicator

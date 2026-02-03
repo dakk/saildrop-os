@@ -16,27 +16,39 @@
 #ifndef CONF_H
 #define CONF_H
 
+/*
+ * Board Selection
+ * ===============
+ * Define ONE of these before including conf.h or via build flags:
+ * - BOARD_LCD_128  : Waveshare ESP32-S3 1.28" Round Touch LCD (240x240)
+ * - BOARD_LCD_4    : Waveshare ESP32-S3 4" Touch LCD (480x480)
+ *
+ * If neither is defined, BOARD_LCD_128 is used by default.
+ * This can be set via Makefile: -DBOARD_LCD_4 or -DBOARD_LCD_128
+ */
+
+// Include board-specific configuration
+// This defines SCREEN_WIDTH, SCREEN_HEIGHT, and hardware pins
+#include "boards/boards.h"
+
 #define DEBUG 1
 #define LVGL_TICK_PERIOD_MS 2
 #define LOOP_DELAY 2
 
-// Screen dimensions - modify these for different display sizes
+// Screen dimensions are now defined in boards/board_*.h
 // The UI will scale automatically via scale.h
-// Examples: 240x240 (default), 128x128, 320x320, 480x480
-#define SCREEN_WIDTH 240
-#define SCREEN_HEIGHT 240
 
 // #define SHOWCASE
 
 // Screen configuration - comment out to disable, reorder to change sequence
 // The order here determines swipe order (left/right navigation)
-#define SCREEN_SPEED      1
+// #define SCREEN_SPEED      1
+#define SCREEN_VALUES     1
 #define SCREEN_WIND       2
 #define SCREEN_COMPASS    3
-#define SCREEN_VALUES     4
-#define SCREEN_AIS        5
-#define SCREEN_TACK       6
-#define SCREEN_TIMER      7
+#define SCREEN_AIS        4
+#define SCREEN_TACK       5
+#define SCREEN_TIMER      6
 
 // #define AP_MODE
 #define AP_SSID "SAILDROP_AP"
