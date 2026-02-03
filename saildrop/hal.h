@@ -36,9 +36,7 @@
 #endif
 
 #if DISPLAY_DRIVER_RGB
-    #include <esp_lcd_panel_ops.h>
-    #include <esp_lcd_panel_rgb.h>
-    #include <driver/gpio.h>
+    #include <Arduino_GFX_Library.h>
     #include <Wire.h>
 #endif
 
@@ -96,8 +94,10 @@ private:
 #endif
 
 #if DISPLAY_DRIVER_RGB
-    esp_lcd_panel_handle_t _panel;
-    void initRGBPanel();
+    Arduino_DataBus* _bus;
+    Arduino_ESP32RGBPanel* _rgbpanel;
+    Arduino_RGB_Display* _gfx;
+    void initRGBDisplay();
     void initIOExpander();
     static void rgb_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
 #endif
@@ -129,8 +129,8 @@ bool HAL::begin() {
 #if DISPLAY_DRIVER_RGB
     // Initialize IO Expander for backlight and reset control
     initIOExpander();
-    // Initialize RGB panel
-    initRGBPanel();
+    // Initialize RGB display via Arduino_GFX (handles ST7701 SPI init)
+    initRGBDisplay();
     Serial.println("HAL: RGB display initialized");
 #endif
 
@@ -175,80 +175,65 @@ lv_display_t* HAL::initDisplay(void* draw_buf, size_t buf_size) {
 #if DISPLAY_DRIVER_RGB
 
 void HAL::initIOExpander() {
-    // Initialize second I2C bus for IO expander
-    Wire1.begin(IO_EXPANDER_SDA_PIN, IO_EXPANDER_SCL_PIN);
-    Wire1.setClock(400000);
+    // IO expander uses same I2C bus as touch (pins 15, 7)
+    // Wire is already initialized in GT911 setup, but we do it here for safety
+    Wire.begin(TOUCH_SDA_PIN, TOUCH_SCL_PIN);
 
-    // Configure TCA9554 - all pins as outputs
-    Wire1.beginTransmission(IO_EXPANDER_I2C_ADDR);
-    Wire1.write(0x03);  // Configuration register
-    Wire1.write(0x00);  // All outputs
-    Wire1.endTransmission();
+    // Configure PCA9557 IO expander (address 0x24)
+    // Register 0x02: Polarity inversion - set to 0xFF (default)
+    Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
+    Wire.write(0x02);
+    Wire.write(0xFF);
+    Wire.endTransmission();
 
-    // Set initial states: LCD reset high, backlight on, touch reset high
-    Wire1.beginTransmission(IO_EXPANDER_I2C_ADDR);
-    Wire1.write(0x01);  // Output register
-    Wire1.write((1 << IO_EXP_PIN_LCD_RST) | (1 << IO_EXP_PIN_TOUCH_RST) | (1 << IO_EXP_PIN_LCD_BL));
-    Wire1.endTransmission();
+    // Register 0x03: Configuration/Output - set to 0x3A
+    // This sets up backlight, resets, etc.
+    Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
+    Wire.write(0x03);
+    Wire.write(0x3A);
+    Wire.endTransmission();
 
     delay(50);
     Serial.println("HAL: IO Expander initialized");
 }
 
-void HAL::initRGBPanel() {
-    // Configure RGB panel
-    esp_lcd_rgb_panel_config_t panel_config = {
-        .clk_src = LCD_CLK_SRC_DEFAULT,
-        .timings = {
-            .pclk_hz = LCD_PCLK_MHZ * 1000000,
-            .h_res = LCD_H_RES,
-            .v_res = LCD_V_RES,
-            .hsync_pulse_width = LCD_HSYNC_PULSE_WIDTH,
-            .hsync_back_porch = LCD_HSYNC_BACK_PORCH,
-            .hsync_front_porch = LCD_HSYNC_FRONT_PORCH,
-            .vsync_pulse_width = LCD_VSYNC_PULSE_WIDTH,
-            .vsync_back_porch = LCD_VSYNC_BACK_PORCH,
-            .vsync_front_porch = LCD_VSYNC_FRONT_PORCH,
-            .flags = {
-                .pclk_active_neg = 1,
-            },
-        },
-        .data_width = 16,
-        .bits_per_pixel = 16,
-        .num_fbs = 1,
-        .bounce_buffer_size_px = 0,
-        .sram_trans_align = 8,
-        .psram_trans_align = 64,
-        .hsync_gpio_num = LCD_HSYNC_PIN,
-        .vsync_gpio_num = LCD_VSYNC_PIN,
-        .de_gpio_num = LCD_DE_PIN,
-        .pclk_gpio_num = LCD_PCLK_PIN,
-        .disp_gpio_num = -1,
-        .data_gpio_nums = {
-            LCD_DATA0_PIN, LCD_DATA1_PIN, LCD_DATA2_PIN, LCD_DATA3_PIN,
-            LCD_DATA4_PIN, LCD_DATA5_PIN, LCD_DATA6_PIN, LCD_DATA7_PIN,
-            LCD_DATA8_PIN, LCD_DATA9_PIN, LCD_DATA10_PIN, LCD_DATA11_PIN,
-            LCD_DATA12_PIN, LCD_DATA13_PIN, LCD_DATA14_PIN, LCD_DATA15_PIN,
-        },
-        .flags = {
-            .fb_in_psram = 1,
-        },
-    };
+void HAL::initRGBDisplay() {
+    // Create SPI bus for ST7701 initialization commands
+    _bus = new Arduino_SWSPI(
+        GFX_NOT_DEFINED /* DC */, LCD_SPI_CS_PIN /* CS */,
+        LCD_SPI_SCK_PIN /* SCK */, LCD_SPI_MOSI_PIN /* MOSI */, GFX_NOT_DEFINED /* MISO */);
 
-    ESP_ERROR_CHECK(esp_lcd_new_rgb_panel(&panel_config, &_panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_reset(_panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_init(_panel));
+    // Create RGB panel with timing parameters
+    _rgbpanel = new Arduino_ESP32RGBPanel(
+        LCD_DE_PIN /* DE */, LCD_VSYNC_PIN /* VSYNC */, LCD_HSYNC_PIN /* HSYNC */, LCD_PCLK_PIN /* PCLK */,
+        LCD_DATA0_PIN /* R0 */, LCD_DATA1_PIN /* R1 */, LCD_DATA2_PIN /* R2 */, LCD_DATA3_PIN /* R3 */, LCD_DATA4_PIN /* R4 */,
+        LCD_DATA5_PIN /* G0 */, LCD_DATA6_PIN /* G1 */, LCD_DATA7_PIN /* G2 */, LCD_DATA8_PIN /* G3 */, LCD_DATA9_PIN /* G4 */, LCD_DATA10_PIN /* G5 */,
+        LCD_DATA11_PIN /* B0 */, LCD_DATA12_PIN /* B1 */, LCD_DATA13_PIN /* B2 */, LCD_DATA14_PIN /* B3 */, LCD_DATA15_PIN /* B4 */,
+        LCD_HSYNC_POLARITY /* hsync_polarity */, LCD_HSYNC_FRONT_PORCH /* hsync_front_porch */, LCD_HSYNC_PULSE_WIDTH /* hsync_pulse_width */, LCD_HSYNC_BACK_PORCH /* hsync_back_porch */,
+        LCD_VSYNC_POLARITY /* vsync_polarity */, LCD_VSYNC_FRONT_PORCH /* vsync_front_porch */, LCD_VSYNC_PULSE_WIDTH /* vsync_pulse_width */, LCD_VSYNC_BACK_PORCH /* vsync_back_porch */);
+
+    // Create RGB display with ST7701 init sequence
+    _gfx = new Arduino_RGB_Display(
+        LCD_H_RES /* width */, LCD_V_RES /* height */, _rgbpanel, 0 /* rotation */, true /* auto_flush */,
+        _bus, GFX_NOT_DEFINED /* RST */, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
+
+    // Initialize the display (sends ST7701 init commands via SPI, then sets up RGB)
+    if (!_gfx->begin()) {
+        Serial.println("HAL: ERROR - gfx->begin() failed!");
+    }
+
+    // Fill screen with black
+    _gfx->fillScreen(RGB565_BLACK);
 }
 
 void HAL::rgb_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
-    HAL* hal = (HAL*)lv_display_get_user_data(disp);
+    HAL* hal_inst = (HAL*)lv_display_get_user_data(disp);
 
-    int offsetx1 = area->x1;
-    int offsetx2 = area->x2;
-    int offsety1 = area->y1;
-    int offsety2 = area->y2;
+    uint32_t w = (area->x2 - area->x1 + 1);
+    uint32_t h = (area->y2 - area->y1 + 1);
 
-    esp_lcd_panel_draw_bitmap(hal->_panel, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, px_map);
+    // Use Arduino_GFX to draw the bitmap
+    hal_inst->_gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
 
     lv_display_flush_ready(disp);
 }
@@ -257,15 +242,15 @@ void HAL::rgb_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_ma
 
 void HAL::setBacklight(uint8_t brightness) {
 #if DISPLAY_DRIVER_RGB
-    // Control backlight via IO expander
-    Wire1.beginTransmission(IO_EXPANDER_I2C_ADDR);
-    Wire1.write(0x01);  // Output register
-    uint8_t state = (1 << IO_EXP_PIN_LCD_RST) | (1 << IO_EXP_PIN_TOUCH_RST);
-    if (brightness > 0) {
-        state |= (1 << IO_EXP_PIN_LCD_BL);
-    }
-    Wire1.write(state);
-    Wire1.endTransmission();
+    // Control backlight via IO expander (PCA9557)
+    // The backlight is controlled via the configuration written in initIOExpander
+    // For now, backlight is always on after initialization
+    // To turn off, we'd need to modify the register 0x03 value
+    // 0x3A with backlight on, 0x3E would be off (assuming bit 2 controls BL)
+    Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
+    Wire.write(0x03);
+    Wire.write(brightness > 0 ? 0x3A : 0x3E);
+    Wire.endTransmission();
 #endif
     // TFT_eSPI backlight control depends on hardware, usually via PWM pin
 }

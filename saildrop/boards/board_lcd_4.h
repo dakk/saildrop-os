@@ -46,18 +46,14 @@
 #define TOUCH_RST_PIN   -1  // Connected via IO expander
 #define TOUCH_INT_PIN   16
 
-// IO Expander I2C pins (TCA9554)
-#define IO_EXPANDER_SDA_PIN     8
-#define IO_EXPANDER_SCL_PIN     9
-#define IO_EXPANDER_I2C_ADDR    0x20
+// IO Expander I2C (PCA9557 at address 0x24)
+// Uses same I2C bus as touch controller
+#define IO_EXPANDER_I2C_ADDR    0x24
 
-// IO Expander pin assignments
-#define IO_EXP_PIN_TOUCH_RST    0
-#define IO_EXP_PIN_LCD_RST      1
-#define IO_EXP_PIN_LCD_CS       2
-#define IO_EXP_PIN_LCD_SDA      3
-#define IO_EXP_PIN_LCD_CLK      4
-#define IO_EXP_PIN_LCD_BL       5  // Backlight control
+// SPI pins for ST7701 initialization (direct GPIO, not via IO expander)
+#define LCD_SPI_CS_PIN      42
+#define LCD_SPI_SCK_PIN     2
+#define LCD_SPI_MOSI_PIN    1
 
 // RGB Display pins
 #define LCD_HSYNC_PIN   38
@@ -65,36 +61,38 @@
 #define LCD_DE_PIN      40
 #define LCD_PCLK_PIN    41
 
-// RGB Data pins (active low directly)
-// R0-R4: GPIO45, GPIO48, GPIO47, GPIO21, GPIO14
-// G0-G5: GPIO13, GPIO12, GPIO11, GPIO10, GPIO9, GPIO46
-// B0-B4: GPIO3, GPIO8, GPIO18, GPIO17, GPIO16
-#define LCD_DATA0_PIN   45  // R0
-#define LCD_DATA1_PIN   48  // R1
-#define LCD_DATA2_PIN   47  // R2
-#define LCD_DATA3_PIN   21  // R3
-#define LCD_DATA4_PIN   14  // R4
-#define LCD_DATA5_PIN   13  // G0
-#define LCD_DATA6_PIN   12  // G1
-#define LCD_DATA7_PIN   11  // G2
-#define LCD_DATA8_PIN   10  // G3
-#define LCD_DATA9_PIN   9   // G4
-#define LCD_DATA10_PIN  46  // G5
-#define LCD_DATA11_PIN  3   // B0
-#define LCD_DATA12_PIN  8   // B1
-#define LCD_DATA13_PIN  18  // B2
-#define LCD_DATA14_PIN  17  // B3
-#define LCD_DATA15_PIN  16  // B4
+// RGB Data pins (from Waveshare official example)
+// R0-R4: GPIO46, GPIO3, GPIO8, GPIO18, GPIO17
+// G0-G5: GPIO14, GPIO13, GPIO12, GPIO11, GPIO10, GPIO9
+// B0-B4: GPIO5, GPIO45, GPIO48, GPIO47, GPIO21
+#define LCD_DATA0_PIN   46  // R0
+#define LCD_DATA1_PIN   3   // R1
+#define LCD_DATA2_PIN   8   // R2
+#define LCD_DATA3_PIN   18  // R3
+#define LCD_DATA4_PIN   17  // R4
+#define LCD_DATA5_PIN   14  // G0
+#define LCD_DATA6_PIN   13  // G1
+#define LCD_DATA7_PIN   12  // G2
+#define LCD_DATA8_PIN   11  // G3
+#define LCD_DATA9_PIN   10  // G4
+#define LCD_DATA10_PIN  9   // G5
+#define LCD_DATA11_PIN  5   // B0
+#define LCD_DATA12_PIN  45  // B1
+#define LCD_DATA13_PIN  48  // B2
+#define LCD_DATA14_PIN  47  // B3
+#define LCD_DATA15_PIN  21  // B4
 
-// RGB timing parameters for ST7701
-#define LCD_H_RES       480
-#define LCD_V_RES       480
-#define LCD_HSYNC_BACK_PORCH    10
-#define LCD_HSYNC_FRONT_PORCH   50
+// RGB timing parameters for ST7701 (from Waveshare official example)
+#define LCD_H_RES               480
+#define LCD_V_RES               480
+#define LCD_HSYNC_FRONT_PORCH   10
 #define LCD_HSYNC_PULSE_WIDTH   8
-#define LCD_VSYNC_BACK_PORCH    10
-#define LCD_VSYNC_FRONT_PORCH   20
+#define LCD_HSYNC_BACK_PORCH    50
+#define LCD_VSYNC_FRONT_PORCH   10
 #define LCD_VSYNC_PULSE_WIDTH   8
+#define LCD_VSYNC_BACK_PORCH    20
+#define LCD_HSYNC_POLARITY      1
+#define LCD_VSYNC_POLARITY      1
 #define LCD_PCLK_MHZ            16
 
 // LVGL buffer size

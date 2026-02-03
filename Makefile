@@ -71,12 +71,11 @@ install-prereq:
 	arduino-cli core install esp32:esp32@2.0.12
 
 # Install prerequisites for 4" LCD
-# Note: The 4" LCD uses RGB parallel interface and doesn't need TFT_eSPI
-# It uses ESP-IDF's esp_lcd_panel driver which is included in the ESP32 core
+# The 4" LCD uses Arduino_GFX library for ST7701 RGB display
 install-prereq-lcd4:
-	arduino-cli core install esp32:esp32@3.0.7
-	@echo "Note: The 4\" LCD uses the built-in esp_lcd_panel driver from ESP-IDF"
-	@echo "No additional display library installation needed"
+	arduino-cli core install esp32:esp32@3.3.5
+	arduino-cli lib install 'GFX Library for Arduino@1.5.3'
+	@echo "Installed ESP32 core 3.3.5 and GFX Library for Arduino 1.5.3"
 
 # Compile for selected board
 compile: set-board
