@@ -42,13 +42,13 @@
 
 // Screen configuration - comment out to disable, reorder to change sequence
 // The order here determines swipe order (left/right navigation)
-#define SCREEN_SPEED      1
+// #define SCREEN_SPEED      1
+#define SCREEN_VALUES     1
 #define SCREEN_WIND       2
 #define SCREEN_COMPASS    3
-#define SCREEN_VALUES     4
-#define SCREEN_AIS        5
-#define SCREEN_TACK       6
-#define SCREEN_TIMER      7
+#define SCREEN_AIS        4
+#define SCREEN_TACK       5
+#define SCREEN_TIMER      6
 
 // #define AP_MODE
 #define AP_SSID "SAILDROP_AP"

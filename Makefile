@@ -13,7 +13,7 @@ ESPTOOL = ~/.arduino15/packages/esp32/tools/esptool_py/5.1.0/esptool
 
 # Board selection: lcd128 (default) or lcd4
 # Usage: make compile BOARD=lcd4
-BOARD ?= lcd128
+BOARD ?= lcd4
 
 # Board-specific configuration
 ifeq ($(BOARD),lcd128)
