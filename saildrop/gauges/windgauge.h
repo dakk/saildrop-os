@@ -106,11 +106,12 @@ public:
 
         // Port (green) close-hauled arc - top left (20° to 60° from bow)
         // LVGL: 0°=right, 270°=top. Port is counter-clockwise from top: 270°-20°=250° to 270°-60°=210°
+        // Extended by 5° on each end to overlap the tick marks
         lv_obj_t *port_arc = lv_arc_create(bg);
         lv_obj_set_size(port_arc, width + SCALE_PX(5), height + SCALE_PX(5));
         lv_obj_center(port_arc);
         lv_arc_set_rotation(port_arc, 0);
-        lv_arc_set_bg_angles(port_arc, 210, 250);
+        lv_arc_set_bg_angles(port_arc, 205, 255);
         lv_arc_set_value(port_arc, 0);
         lv_obj_remove_style(port_arc, nullptr, LV_PART_KNOB);
         lv_obj_remove_style(port_arc, nullptr, LV_PART_INDICATOR);
@@ -121,11 +122,12 @@ public:
 
         // Starboard (red) close-hauled arc - top right (20° to 60° from bow)
         // LVGL: 0°=right, 270°=top. Starboard is clockwise from top: 270°+20°=290° to 270°+60°=330°
+        // Extended by 5° on each end to overlap the tick marks
         lv_obj_t *stbd_arc = lv_arc_create(bg);
         lv_obj_set_size(stbd_arc, width + SCALE_PX(5), height + SCALE_PX(5));
         lv_obj_center(stbd_arc);
         lv_arc_set_rotation(stbd_arc, 0);
-        lv_arc_set_bg_angles(stbd_arc, 290, 330);
+        lv_arc_set_bg_angles(stbd_arc, 285, 335);
         lv_arc_set_value(stbd_arc, 0);
         lv_obj_remove_style(stbd_arc, nullptr, LV_PART_KNOB);
         lv_obj_remove_style(stbd_arc, nullptr, LV_PART_INDICATOR);
