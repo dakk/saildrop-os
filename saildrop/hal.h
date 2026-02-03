@@ -171,10 +171,12 @@ bool HAL::begin() {
 
 #if TOUCH_DRIVER_GT911
     // Initialize GT911 touch
+    // Note: Wire is already initialized by initIOExpander(), don't reinitialize
     Serial.println("HAL: Initializing GT911 touch...");
     Serial.flush();
     _touch_gt911 = new GT911(TOUCH_SDA_PIN, TOUCH_SCL_PIN, TOUCH_RST_PIN, TOUCH_INT_PIN);
-    _touch_gt911->begin(&Wire);
+    // Pass false to skip Wire.begin() - it's already initialized
+    _touch_gt911->begin(&Wire, false);
     Serial.println("HAL: GT911 touch initialized");
     Serial.flush();
 #endif
@@ -210,30 +212,32 @@ void HAL::initIOExpander() {
     Wire.begin(TOUCH_SDA_PIN, TOUCH_SCL_PIN);
     Wire.setClock(100000);  // Use 100kHz for reliability during init
 
-    Serial.println("HAL: Configuring IO Expander...");
+    Serial.println("HAL: Configuring IO Expander (PCA9557)...");
     Serial.flush();
 
     // PCA9557 IO Expander Pin mapping (Waveshare ESP32-S3-Touch-LCD-4):
-    // P0 (0x01): LCD backlight enable (high = on)
+    // P0 (0x01): LCD backlight enable
     // P2 (0x04): LCD reset (active low)
-    // P4 (0x10): Touch reset (active low)
     //
     // Register 0x01: Output port register (actual pin values)
     // Register 0x02: Polarity inversion
     // Register 0x03: Configuration (0 = output, 1 = input)
 
-    // Step 1: Configure pins as outputs first
+    // IMPORTANT: Order matters! Polarity first, then configuration
+    // This matches the official Waveshare example exactly
+
+    // Step 1: Set polarity inversion FIRST (as per official Waveshare example)
+    Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
+    Wire.write(0x02);  // Polarity inversion register
+    Wire.write(0xFF);  // Invert all pins
+    Wire.endTransmission();
+    delay(10);
+
+    // Step 2: Configure pins as outputs
     // 0x3A = 0b00111010 means P0, P2, P6, P7 are outputs (bits = 0)
     Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
     Wire.write(0x03);  // Configuration register
     Wire.write(0x3A);
-    Wire.endTransmission();
-    delay(10);
-
-    // Step 2: Set polarity inversion (keep original Waveshare setting)
-    Wire.beginTransmission(IO_EXPANDER_I2C_ADDR);
-    Wire.write(0x02);
-    Wire.write(0xFF);  // Polarity inversion as per Waveshare reference
     Wire.endTransmission();
     delay(10);
 

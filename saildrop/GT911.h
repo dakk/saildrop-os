@@ -30,11 +30,7 @@
 #define GT911_REG_COMMAND       0x8040
 #define GT911_REG_CONFIG        0x8047
 #define GT911_REG_STATUS        0x814E
-#define GT911_REG_POINT1        0x8150
-#define GT911_REG_POINT2        0x8158
-#define GT911_REG_POINT3        0x8160
-#define GT911_REG_POINT4        0x8168
-#define GT911_REG_POINT5        0x8170
+#define GT911_REG_POINT1        0x814F  // First point data (8 bytes per point)
 #define GT911_REG_PRODUCT_ID    0x8140
 
 // Gesture IDs (compatible with CST816S)
@@ -65,7 +61,8 @@ class GT911 {
 public:
     GT911(int sda, int scl, int rst, int irq);
 
-    bool begin(TwoWire *wire = &Wire);
+    // skipWireBegin: set to true if Wire.begin() was already called
+    bool begin(TwoWire *wire = &Wire, bool skipWireBegin = false);
     bool available();
     void sleep();
 
@@ -74,6 +71,9 @@ public:
 
     // Get product ID
     void getProductID(char* id, int len);
+
+    // Debug: scan I2C bus
+    void scanI2C();
 
 private:
     int _sda;
@@ -111,14 +111,20 @@ GT911::GT911(int sda, int scl, int rst, int irq)
     memset(&data, 0, sizeof(data));
 }
 
-bool GT911::begin(TwoWire *wire) {
+bool GT911::begin(TwoWire *wire, bool skipWireBegin) {
     _wire = wire;
 
-    // Initialize I2C
-    _wire->begin(_sda, _scl);
+    // Initialize I2C only if not skipped (Wire may already be initialized)
+    if (!skipWireBegin) {
+        _wire->begin(_sda, _scl);
+    }
     _wire->setClock(400000);  // 400kHz
 
-    // Reset sequence
+    // Scan I2C bus to help diagnose issues
+    Serial.println("GT911: Scanning I2C bus...");
+    scanI2C();
+
+    // Reset sequence - only if we have direct reset pin access
     if (_rst >= 0) {
         reset();
     }
@@ -130,7 +136,8 @@ bool GT911::begin(TwoWire *wire) {
 
     // Find the correct I2C address
     if (!findAddress()) {
-        Serial.println("GT911: Device not found");
+        Serial.println("GT911: Device not found on I2C bus!");
+        Serial.println("GT911: Make sure the IO expander is properly configured");
         return false;
     }
 
@@ -142,6 +149,31 @@ bool GT911::begin(TwoWire *wire) {
     Serial.printf("GT911: Initialized at address 0x%02X, Product ID: %s\n", _addr, productId);
 
     return true;
+}
+
+void GT911::scanI2C() {
+    Serial.println("I2C scan results:");
+    int nDevices = 0;
+    for (uint8_t address = 1; address < 127; address++) {
+        _wire->beginTransmission(address);
+        uint8_t error = _wire->endTransmission();
+        if (error == 0) {
+            Serial.printf("  Found device at 0x%02X", address);
+            if (address == GT911_ADDR_1 || address == GT911_ADDR_2) {
+                Serial.print(" (GT911 candidate)");
+            }
+            if (address == 0x24) {
+                Serial.print(" (IO Expander PCA9557)");
+            }
+            Serial.println();
+            nDevices++;
+        }
+    }
+    if (nDevices == 0) {
+        Serial.println("  No I2C devices found!");
+    } else {
+        Serial.printf("  Total: %d device(s)\n", nDevices);
+    }
 }
 
 void GT911::reset() {
@@ -218,9 +250,19 @@ void GT911::getProductID(char* id, int len) {
 bool GT911::available() {
     if (!_initialized) return false;
 
-    // Check if interrupt pin is low (touch available)
-    if (_irq >= 0 && digitalRead(_irq) == HIGH) {
-        // No touch, but check for gesture completion
+    // Always poll via I2C status register
+    // The interrupt pin on some boards (like ESP32-S3-Touch-LCD-4) may not be reliable
+    // or may require different handling when controlled via IO expander
+
+    // Read status register
+    uint8_t status = readRegister(GT911_REG_STATUS);
+
+    // Check buffer status (bit 7) and number of touch points (bits 0-3)
+    bool bufferReady = (status & 0x80) != 0;
+    uint8_t touchPoints = status & 0x0F;
+
+    if (!bufferReady) {
+        // No touch data ready, but check for gesture completion
         if (_tracking && (millis() - _lastTouchTime) > 50) {
             data.gestureID = detectGesture();
             _tracking = false;
@@ -231,20 +273,12 @@ bool GT911::available() {
         return false;
     }
 
-    // Read status register
-    uint8_t status = readRegister(GT911_REG_STATUS);
-
-    // Check buffer status (bit 7) and number of touch points (bits 0-3)
-    if (!(status & 0x80)) {
-        return false;
-    }
-
-    data.points = status & 0x0F;
+    data.points = touchPoints;
 
     if (data.points > 0 && data.points <= 5) {
         readTouchPoints();
 
-        // Clear status
+        // Clear status (MUST clear after reading)
         writeRegister(GT911_REG_STATUS, 0);
 
         // Track for gesture detection
@@ -257,21 +291,32 @@ bool GT911::available() {
         }
         _lastTouchTime = now;
 
-        // For single click, return immediately
+        // For now, set gesture to NONE (will be detected on release)
         data.gestureID = GT911_NONE;
         data.event = 2;  // Contact
 
         return true;
     }
 
-    // Clear status
+    // Clear status even if no valid points
     writeRegister(GT911_REG_STATUS, 0);
     return false;
 }
 
 void GT911::readTouchPoints() {
-    uint8_t buf[40];  // 8 bytes per point, up to 5 points
-    readRegisters(GT911_REG_POINT1, buf, data.points * 8);
+    // Read all point data at once (8 bytes per point, up to 5 points)
+    uint8_t buf[40];
+    uint8_t bytesToRead = data.points * 8;
+    if (bytesToRead > 40) bytesToRead = 40;
+
+    readRegisters(GT911_REG_POINT1, buf, bytesToRead);
+
+    // Each point is 8 bytes:
+    // [0]: trackID
+    // [1-2]: x (little endian)
+    // [3-4]: y (little endian)
+    // [5-6]: size (little endian)
+    // [7]: reserved
 
     // Parse first touch point
     data.x = buf[1] | (buf[2] << 8);
@@ -279,20 +324,20 @@ void GT911::readTouchPoints() {
 
     // Parse additional points if available
     if (data.points >= 2) {
-        data.x2 = buf[9] | (buf[10] << 8);
-        data.y2 = buf[11] | (buf[12] << 8);
+        data.x2 = buf[8 + 1] | (buf[8 + 2] << 8);
+        data.y2 = buf[8 + 3] | (buf[8 + 4] << 8);
     }
     if (data.points >= 3) {
-        data.x3 = buf[17] | (buf[18] << 8);
-        data.y3 = buf[19] | (buf[20] << 8);
+        data.x3 = buf[16 + 1] | (buf[16 + 2] << 8);
+        data.y3 = buf[16 + 3] | (buf[16 + 4] << 8);
     }
     if (data.points >= 4) {
-        data.x4 = buf[25] | (buf[26] << 8);
-        data.y4 = buf[27] | (buf[28] << 8);
+        data.x4 = buf[24 + 1] | (buf[24 + 2] << 8);
+        data.y4 = buf[24 + 3] | (buf[24 + 4] << 8);
     }
     if (data.points >= 5) {
-        data.x5 = buf[33] | (buf[34] << 8);
-        data.y5 = buf[35] | (buf[36] << 8);
+        data.x5 = buf[32 + 1] | (buf[32 + 2] << 8);
+        data.y5 = buf[32 + 3] | (buf[32 + 4] << 8);
     }
 }
 
