@@ -30,7 +30,8 @@ else ifeq ($(BOARD),lcd4)
     BOARD_DEFINE = BOARD_LCD_4
     LV_CONF_FILE = lv_conf_lcd4.h
     # LCD-4 uses ESP32-S3N16R8 with 8MB Octal PSRAM (OPI mode)
-    BOARD_OPTIONS = --board-options PSRAM=opi,FlashSize=16M,PartitionScheme=huge_app
+    # USBMode=hwcdc + CDCOnBoot=cdc enables serial output through USB port
+    BOARD_OPTIONS = --board-options PSRAM=opi,FlashSize=16M,PartitionScheme=huge_app,USBMode=hwcdc,CDCOnBoot=cdc
     BUILD_PROPERTY = --build-property build.flash_size=16MB \
         --build-property build.psram=opi
 else
