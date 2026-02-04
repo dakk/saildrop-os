@@ -67,7 +67,7 @@ public:
 
         // Title label
         lv_obj_t *title = lv_label_create(bg);
-        lv_obj_align(title, LV_ALIGN_CENTER, 0, -SCALE_PX(50));
+        lv_obj_align(title, LV_ALIGN_CENTER, 0, -SCALE_PX(25));
         lv_label_set_text(title, label_str);
         lv_obj_set_style_text_color(title, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
         lv_obj_set_style_text_font(title, ui_scale::font_small(), 0);
@@ -81,7 +81,7 @@ public:
 
         // Unit label
         lv_obj_t *unit_lbl = lv_label_create(bg);
-        lv_obj_align(unit_lbl, LV_ALIGN_CENTER, 0, SCALE_PX(45));
+        lv_obj_align(unit_lbl, LV_ALIGN_CENTER, 0, SCALE_PX(25));
         lv_label_set_text(unit_lbl, unit_str);
         lv_obj_set_style_text_color(unit_lbl, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
         lv_obj_set_style_text_font(unit_lbl, ui_scale::font_medium(), 0);

@@ -1,3 +1,4 @@
 *.zip
 ESP32-S3*
 SQEX
+*.pyc
