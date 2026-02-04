@@ -1,3 +1,10 @@
 Pillow>=9.0.0
 requests>=2.28.0
 mercantile>=1.2.0
+
+# Optional: For local tile rendering with custom styles
+# Requires system libraries:
+#   Gentoo: sudo emerge -av sci-geosciences/mapnik sci-libs/gdal
+#   Ubuntu: sudo apt install python3-mapnik gdal-bin
+#   macOS: brew install mapnik gdal
+# mapnik>=0.1

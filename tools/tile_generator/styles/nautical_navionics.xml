@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE Map []>
+<!--
+    Saildrop-OS Navionics-Style Theme for Mapnik
+
+    A light nautical chart theme inspired by Navionics colors.
+    Light blue water, beige/tan land - optimized for daytime use.
+
+    Usage:
+        python tile_generator.py
+            - -lat 40.0 - -lon 9.5 - -radius 50 - -zoom 10,11,12
+            - -output ./tiles - -renderer mapnik - -style styles/nautical_navionics.xml
+            - -osm-data your-region.osm
+
+    Color Palette:
+        Water: #9ed4e6 (light blue)
+        Land: #f0e6d2 (beige/tan)
+        Coastline: #2c5aa0 (dark blue)
+        Labels: #1a3a6a (navy blue)
+        Roads: #ffffff / #e8e8e8 (white/light gray)
+-->
+
+<Map background-color="#9ed4e6" srs="+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over">
+
+    <FontSet name="sans">
+        <Font face-name="DejaVu Sans Book" />
+        <Font face-name="Noto Sans Regular" />
+        <Font face-name="Liberation Sans Regular" />
+    </FontSet>
+
+    <FontSet name="sans-bold">
+        <Font face-name="DejaVu Sans Bold" />
+        <Font face-name="Noto Sans Bold" />
+        <Font face-name="Liberation Sans Bold" />
+    </FontSet>
+
+    <!-- Water areas -->
+    <Style name="water">
+        <Rule>
+            <Filter>[natural] = 'water' or [water] != ''</Filter>
+            <PolygonSymbolizer fill="#9ed4e6" />
+        </Rule>
+    </Style>
+
+    <!-- Land -->
+    <Style name="land">
+        <Rule>
+            <PolygonSymbolizer fill="#f0e6d2" />
+            <LineSymbolizer stroke="#c4b8a0" stroke-width="0.5" />
+        </Rule>
+    </Style>
+
+    <!-- Coastline -->
+    <Style name="coastline">
+        <Rule>
+            <Filter>[natural] = 'coastline'</Filter>
+            <LineSymbolizer stroke="#2c5aa0" stroke-width="1.5" stroke-linejoin="round" />
+        </Rule>
+    </Style>
+
+    <!-- Rivers and waterways -->
+    <Style name="waterway">
+        <Rule>
+            <Filter>[waterway] = 'river'</Filter>
+            <LineSymbolizer stroke="#9ed4e6" stroke-width="3" stroke-linejoin="round" />
+        </Rule>
+        <Rule>
+            <Filter>[waterway] = 'canal'</Filter>
+            <LineSymbolizer stroke="#9ed4e6" stroke-width="2" stroke-linejoin="round" />
+        </Rule>
+        <Rule>
+            <Filter>[waterway] = 'stream'</Filter>
+            <LineSymbolizer stroke="#9ed4e6" stroke-width="1" />
+        </Rule>
+    </Style>
+
+    <!-- Lakes -->
+    <Style name="lakes">
+        <Rule>
+            <Filter>[natural] = 'water' or [natural] = 'lake' or [water] = 'lake'</Filter>
+            <PolygonSymbolizer fill="#9ed4e6" />
+            <LineSymbolizer stroke="#2c5aa0" stroke-width="0.5" />
+        </Rule>
+    </Style>
+
+    <!-- Roads -->
+    <Style name="roads">
+        <Rule>
+            <Filter>[highway] = 'motorway' or [highway] = 'trunk'</Filter>
+            <LineSymbolizer stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+        </Rule>
+        <Rule>
+            <Filter>[highway] = 'primary'</Filter>
+            <LineSymbolizer stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+        </Rule>
+        <Rule>
+            <Filter>[highway] = 'secondary' or [highway] = 'tertiary'</Filter>
+            <LineSymbolizer stroke="#e8e8e8" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+        </Rule>
+    </Style>
+
+    <!-- Marinas and harbors -->
+    <Style name="marina">
+        <Rule>
+            <Filter>[leisure] = 'marina'</Filter>
+            <PolygonSymbolizer fill="#b8e0f0" />
+            <LineSymbolizer stroke="#2c5aa0" stroke-width="1.5" />
+        </Rule>
+        <Rule>
+            <Filter>[man_made] = 'pier' or [man_made] = 'breakwater'</Filter>
+            <LineSymbolizer stroke="#2c5aa0" stroke-width="2" />
+        </Rule>
+    </Style>
+
+    <!-- Seamarks (magenta for visibility) -->
+    <Style name="seamark">
+        <Rule>
+            <Filter>[seamark_type] != ''</Filter>
+            <MarkersSymbolizer fill="#d4006a" width="8" height="8" allow-overlap="true" />
+        </Rule>
+    </Style>
+
+    <!-- Mountain peaks -->
+    <Style name="peaks">
+        <Rule>
+            <Filter>[natural] = 'peak'</Filter>
+            <MarkersSymbolizer fill="#8b4513" width="6" height="6" marker-type="ellipse" />
+            <TextSymbolizer fontset-name="sans" size="9" fill="#8b4513"
+                            halo-fill="#ffffff" halo-radius="1" placement="point"
+                            dy="-8" allow-overlap="false">
+                [name]
+            </TextSymbolizer>
+        </Rule>
+    </Style>
+
+    <!-- Major place labels -->
+    <Style name="place-labels-major">
+        <Rule>
+            <Filter>[place] = 'city'</Filter>
+            <TextSymbolizer fontset-name="sans-bold" size="14" fill="#1a3a6a"
+                            halo-fill="#ffffff" halo-radius="2" placement="point"
+                            allow-overlap="false" minimum-distance="50">
+                [name]
+            </TextSymbolizer>
+        </Rule>
+        <Rule>
+            <Filter>[place] = 'town'</Filter>
+            <TextSymbolizer fontset-name="sans" size="12" fill="#1a3a6a"
+                            halo-fill="#ffffff" halo-radius="2" placement="point"
+                            allow-overlap="false" minimum-distance="30">
+                [name]
+            </TextSymbolizer>
+        </Rule>
+    </Style>
+
+    <!-- Minor place labels -->
+    <Style name="place-labels-minor">
+        <Rule>
+            <Filter>[place] = 'village'</Filter>
+            <TextSymbolizer fontset-name="sans" size="10" fill="#4a6a9a"
+                            halo-fill="#ffffff" halo-radius="1" placement="point"
+                            allow-overlap="false" minimum-distance="20">
+                [name]
+            </TextSymbolizer>
+        </Rule>
+        <Rule>
+            <Filter>[place] = 'hamlet' or [place] = 'island' or [place] = 'islet'</Filter>
+            <TextSymbolizer fontset-name="sans" size="9" fill="#4a6a9a"
+                            halo-fill="#ffffff" halo-radius="1" placement="point"
+                            allow-overlap="false" minimum-distance="15">
+                [name]
+            </TextSymbolizer>
+        </Rule>
+    </Style>
+
+    <!-- Layers (bottom to top) -->
+
+    <Layer name="land" srs="+proj=longlat +datum=WGS84">
+        <StyleName>land</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">multipolygons</Parameter>
+        </Datasource>
+    </Layer>
+
+    <Layer name="water" srs="+proj=longlat +datum=WGS84">
+        <StyleName>water</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">multipolygons</Parameter>
+        </Datasource>
+    </Layer>
+
+    <Layer name="lakes" srs="+proj=longlat +datum=WGS84">
+        <StyleName>lakes</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">multipolygons</Parameter>
+        </Datasource>
+    </Layer>
+
+    <Layer name="coastline" srs="+proj=longlat +datum=WGS84">
+        <StyleName>coastline</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">lines</Parameter>
+        </Datasource>
+    </Layer>
+
+    <Layer name="waterways" srs="+proj=longlat +datum=WGS84">
+        <StyleName>waterway</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">lines</Parameter>
+        </Datasource>
+    </Layer>
+
+    <Layer name="marina" srs="+proj=longlat +datum=WGS84">
+        <StyleName>marina</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">multipolygons</Parameter>
+        </Datasource>
+    </Layer>
+
+    <Layer name="roads" srs="+proj=longlat +datum=WGS84">
+        <StyleName>roads</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">lines</Parameter>
+        </Datasource>
+    </Layer>
+
+    <Layer name="seamark" srs="+proj=longlat +datum=WGS84">
+        <StyleName>seamark</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">points</Parameter>
+        </Datasource>
+    </Layer>
+
+    <Layer name="peaks" srs="+proj=longlat +datum=WGS84">
+        <StyleName>peaks</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">points</Parameter>
+        </Datasource>
+    </Layer>
+
+    <Layer name="place-labels-major" srs="+proj=longlat +datum=WGS84">
+        <StyleName>place-labels-major</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">points</Parameter>
+        </Datasource>
+    </Layer>
+
+    <Layer name="place-labels-minor" srs="+proj=longlat +datum=WGS84">
+        <StyleName>place-labels-minor</StyleName>
+        <Datasource>
+            <Parameter name="type">ogr</Parameter>
+            <Parameter name="file">OSMDATA</Parameter>
+            <Parameter name="layer">points</Parameter>
+        </Datasource>
+    </Layer>
+
+</Map>
