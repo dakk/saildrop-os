@@ -62,6 +62,78 @@ HEADERS = {
 # Overpass API endpoint
 OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 
+# OSM Land polygons (pre-processed coastlines)
+LAND_POLYGONS_URL = "https://osmdata.openstreetmap.de/download/simplified-land-polygons-complete-3857.zip"
+
+
+def download_land_polygons(output_dir: str, verbose: bool = True) -> str:
+    """
+    Download pre-processed OSM land polygons shapefile.
+
+    These are coastlines converted to proper land polygons by OpenStreetMap.
+    Required for proper land/water rendering since raw OSM coastlines are just lines.
+
+    Args:
+        output_dir: Directory to save the shapefile
+        verbose: Print progress messages
+
+    Returns:
+        Path to the shapefile
+    """
+    import zipfile
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    shapefile_dir = output_path / "simplified-land-polygons-complete-3857"
+    shapefile_path = shapefile_dir / "simplified_land_polygons.shp"
+
+    if shapefile_path.exists():
+        if verbose:
+            print(f"  Using existing land polygons: {shapefile_path}")
+        return str(shapefile_path)
+
+    zip_path = output_path / "land-polygons.zip"
+
+    if verbose:
+        print("Downloading OSM land polygons (this may take a while)...")
+        print(f"  URL: {LAND_POLYGONS_URL}")
+
+    try:
+        response = requests.get(LAND_POLYGONS_URL, headers=HEADERS, stream=True, timeout=600)
+        response.raise_for_status()
+
+        total_size = int(response.headers.get('content-length', 0))
+        downloaded = 0
+
+        with open(zip_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+                downloaded += len(chunk)
+                if verbose and total_size > 0:
+                    pct = downloaded * 100 // total_size
+                    print(f"\r  Downloading: {pct}% ({downloaded // 1024 // 1024}MB)", end="")
+
+        if verbose:
+            print(f"\n  Downloaded: {zip_path}")
+            print("  Extracting...")
+
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall(output_path)
+
+        # Clean up zip
+        zip_path.unlink()
+
+        if verbose:
+            print(f"  Land polygons ready: {shapefile_path}")
+
+        return str(shapefile_path)
+
+    except Exception as e:
+        print(f"Error downloading land polygons: {e}")
+        print("You can manually download from: https://osmdata.openstreetmap.de/data/land-polygons.html")
+        return None
+
 
 def convert_osm_to_gpkg(osm_file: str, verbose: bool = True) -> str:
     """
@@ -217,6 +289,13 @@ def download_osm_data(center_lat: float, center_lon: float, radius_nm: float,
   relation["boundary"="administrative"]["admin_level"="2"](around:{radius_m},{center_lat},{center_lon});
   way["natural"="land"](around:{radius_m},{center_lat},{center_lon});
   relation["natural"="land"](around:{radius_m},{center_lat},{center_lon});
+  way["place"="island"](around:{radius_m},{center_lat},{center_lon});
+  way["place"="islet"](around:{radius_m},{center_lat},{center_lon});
+  relation["place"="island"](around:{radius_m},{center_lat},{center_lon});
+
+  // Landuse for better land coverage
+  way["landuse"](around:{radius_m},{center_lat},{center_lon});
+  relation["landuse"](around:{radius_m},{center_lat},{center_lon});
 
   // Major roads (for context on land)
   way["highway"="motorway"](around:{radius_m},{center_lat},{center_lon});
@@ -459,58 +538,99 @@ class MapnikRenderer:
 
 
 def create_default_nautical_style(output_path: str, osm_data: str = None,
-                                   theme: str = "navionics") -> str:
+                                   theme: str = "navionics", land_shapefile: str = None) -> str:
     """
     Create a default nautical-themed Mapnik style file.
 
     Args:
         output_path: Where to save the style file
         osm_data: Path to OSM data file (optional, will be placeholder if not provided)
-        theme: Color theme - "navionics" (light blue water) or "dark" (dark theme)
+        theme: Color theme - "dark", "navionics", "cm93", or "default"
+        land_shapefile: Path to land polygons shapefile (for proper coastline rendering)
 
     Returns:
         Path to created style file
     """
     osm_file = osm_data if osm_data else "OSMDATA"
+    land_file = land_shapefile if land_shapefile else osm_file
 
-    # Navionics-style colors (light nautical chart theme)
+    # Color palettes based on nautical chart styles
+    # Each palette: water, water_light, land, accent
     if theme == "navionics":
         colors = {
-            "water": "#9ed4e6",           # Light blue water
-            "water_shallow": "#c8eaf4",   # Very shallow water
-            "land": "#f0e6d2",            # Beige/tan land
-            "land_stroke": "#c4b8a0",     # Land border
-            "coastline": "#2c5aa0",       # Dark blue coastline
-            "river": "#9ed4e6",           # Same as water
-            "road_major": "#ffffff",      # White roads
-            "road_minor": "#e8e8e8",      # Light gray roads
-            "building": "#d8d0c0",        # Slightly darker than land
-            "label_major": "#1a3a6a",     # Dark blue labels
-            "label_minor": "#4a6a9a",     # Medium blue labels
-            "label_halo": "#ffffff",      # White halo
-            "marina": "#b8e0f0",          # Light blue marina
-            "marina_stroke": "#2c5aa0",   # Dark blue marina border
-            "peak": "#8b4513",            # Brown for peaks
-            "seamark": "#d4006a",         # Magenta for seamarks
+            "water": "#20B0F8",           # Bright blue water
+            "water_shallow": "#A0D8F8",   # Light blue shallow
+            "land": "#3E3A1C",            # Dark brown land
+            "land_stroke": "#2E2A0C",     # Darker brown border
+            "coastline": "#F8E870",       # Yellow coastline
+            "river": "#20B0F8",           # Same as water
+            "road_major": "#F8E870",      # Yellow roads
+            "road_minor": "#C8B840",      # Darker yellow roads
+            "building": "#4E4A2C",        # Slightly lighter than land
+            "label_major": "#F8E870",     # Yellow labels
+            "label_minor": "#D8C850",     # Darker yellow labels
+            "label_halo": "#3E3A1C",      # Land color halo
+            "marina": "#30C0F8",          # Lighter blue marina
+            "marina_stroke": "#F8E870",   # Yellow marina border
+            "peak": "#F8E870",            # Yellow for peaks
+            "seamark": "#F8E870",         # Yellow for seamarks
         }
-    else:  # dark theme
+    elif theme == "cm93":
         colors = {
-            "water": "#1a232e",
-            "water_shallow": "#1e2832",
-            "land": "#2d3a47",
-            "land_stroke": "#3d4a57",
-            "coastline": "#4a90a4",
-            "river": "#1a232e",
-            "road_major": "#4a4a4a",
-            "road_minor": "#333333",
-            "building": "#3d4a57",
-            "label_major": "#aabbcc",
-            "label_minor": "#778899",
-            "label_halo": "#1a232e",
-            "marina": "#1e2832",
-            "marina_stroke": "#4a90a4",
-            "peak": "#8899aa",
-            "seamark": "#ff6699",
+            "water": "#73B6EF",           # Medium blue water
+            "water_shallow": "#D4EAEE",   # Very light blue shallow
+            "land": "#525A5C",            # Gray land
+            "land_stroke": "#424A4C",     # Darker gray border
+            "coastline": "#C9B97A",       # Tan coastline
+            "river": "#73B6EF",           # Same as water
+            "road_major": "#C9B97A",      # Tan roads
+            "road_minor": "#A9996A",      # Darker tan roads
+            "building": "#626A6C",        # Lighter gray
+            "label_major": "#C9B97A",     # Tan labels
+            "label_minor": "#B9A96A",     # Darker tan labels
+            "label_halo": "#525A5C",      # Land color halo
+            "marina": "#83C6FF",          # Lighter blue marina
+            "marina_stroke": "#C9B97A",   # Tan marina border
+            "peak": "#C9B97A",            # Tan for peaks
+            "seamark": "#C9B97A",         # Tan for seamarks
+        }
+    elif theme == "default":
+        colors = {
+            "water": "#6C6CA4",           # Purple-blue water
+            "water_shallow": "#6C6CA4",   # Same
+            "land": "#CC3333",            # Red land
+            "land_stroke": "#AA2222",     # Darker red border
+            "coastline": "#E7DD1D",       # Yellow coastline
+            "river": "#6C6CA4",           # Same as water
+            "road_major": "#E7DD1D",      # Yellow roads
+            "road_minor": "#C7BD0D",      # Darker yellow roads
+            "building": "#DC4343",        # Lighter red
+            "label_major": "#E7DD1D",     # Yellow labels
+            "label_minor": "#D7CD0D",     # Darker yellow labels
+            "label_halo": "#CC3333",      # Land color halo
+            "marina": "#7C7CB4",          # Lighter blue marina
+            "marina_stroke": "#E7DD1D",   # Yellow marina border
+            "peak": "#E7DD1D",            # Yellow for peaks
+            "seamark": "#E7DD1D",         # Yellow for seamarks
+        }
+    else:  # dark theme (default)
+        colors = {
+            "water": "#16232F",           # Very dark blue water
+            "water_shallow": "#070707",   # Almost black
+            "land": "#363C3D",            # Dark gray land
+            "land_stroke": "#464C4D",     # Lighter gray border
+            "coastline": "#2C291B",       # Dark brown coastline
+            "river": "#16232F",           # Same as water
+            "road_major": "#565C5D",      # Medium gray roads
+            "road_minor": "#464C4D",      # Darker gray roads
+            "building": "#464C4D",        # Same as border
+            "label_major": "#8899AA",     # Light gray labels
+            "label_minor": "#667788",     # Medium gray labels
+            "label_halo": "#16232F",      # Water color halo
+            "marina": "#263340",          # Slightly lighter water
+            "marina_stroke": "#2C291B",   # Dark brown marina border
+            "peak": "#8899AA",            # Light gray for peaks
+            "seamark": "#FF6699",         # Pink for seamarks
         }
 
     style_xml = f'''<?xml version="1.0" encoding="utf-8"?>
@@ -519,23 +639,33 @@ def create_default_nautical_style(output_path: str, osm_data: str = None,
 
     <!-- Nautical chart style for Saildrop-OS ({theme} theme) -->
 
-    <Style name="water">
+    <Style name="land-base">
         <Rule>
-            <Filter>[natural] = 'water' or [water] != ''</Filter>
-            <PolygonSymbolizer fill="{colors["water"]}" />
+            <!-- Render land polygons with coastline border -->
+            <PolygonSymbolizer fill="{colors["land"]}" />
+            <LineSymbolizer stroke="{colors["coastline"]}" stroke-width="1.5" stroke-linejoin="round" />
         </Rule>
     </Style>
 
-    <Style name="land">
+    <Style name="water">
         <Rule>
-            <PolygonSymbolizer fill="{colors["land"]}" />
-            <LineSymbolizer stroke="{colors["land_stroke"]}" stroke-width="0.5" />
+            <!-- Water bodies overdraw land -->
+            <Filter>[natural] = 'water' or [water] != '' or [waterway] = 'riverbank'</Filter>
+            <PolygonSymbolizer fill="{colors["water"]}" />
         </Rule>
     </Style>
 
     <Style name="coastline">
         <Rule>
             <Filter>[natural] = 'coastline'</Filter>
+            <LineSymbolizer stroke="{colors["coastline"]}" stroke-width="2" stroke-linejoin="round" />
+        </Rule>
+    </Style>
+
+    <Style name="land-border">
+        <Rule>
+            <!-- Add coastline border to islands -->
+            <Filter>[place] = 'island' or [place] = 'islet'</Filter>
             <LineSymbolizer stroke="{colors["coastline"]}" stroke-width="1.5" stroke-linejoin="round" />
         </Rule>
     </Style>
@@ -593,20 +723,19 @@ def create_default_nautical_style(output_path: str, osm_data: str = None,
         </Rule>
     </Style>
 
-    <Style name="seamark">
-        <Rule>
-            <Filter>[seamark_type] != ''</Filter>
-            <MarkersSymbolizer fill="{colors["seamark"]}" width="8" height="8" allow-overlap="true" />
-        </Rule>
-    </Style>
+    <!-- Seamarks: Using OpenSeaMap tile overlay instead of rendering from OSM data -->
+    <!-- OpenSeaMap provides proper nautical symbols (buoys, lights, etc.) -->
 
     <Style name="peaks">
         <Rule>
             <Filter>[natural] = 'peak'</Filter>
-            <MarkersSymbolizer fill="{colors["peak"]}" width="6" height="6" marker-type="ellipse" />
+            <!-- Triangle marker for peaks (traditional cartographic symbol) -->
+            <MarkersSymbolizer fill="{colors["peak"]}" stroke="{colors["label_halo"]}" stroke-width="0.5"
+                               width="8" height="8" marker-type="arrow" transform="rotate(180)"
+                               allow-overlap="false" />
             <TextSymbolizer face-name="DejaVu Sans Book" size="9" fill="{colors["peak"]}"
                             halo-fill="{colors["label_halo"]}" halo-radius="1" placement="point"
-                            dy="-8" allow-overlap="false">
+                            dy="-10" allow-overlap="false">
                 [name]
             </TextSymbolizer>
         </Rule>
@@ -652,12 +781,11 @@ def create_default_nautical_style(output_path: str, osm_data: str = None,
 
     <!-- Layers (bottom to top) -->
 
-    <Layer name="land" srs="+proj=longlat +datum=WGS84">
-        <StyleName>land</StyleName>
+    <Layer name="land" srs="+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0.0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs +over">
+        <StyleName>land-base</StyleName>
         <Datasource>
-            <Parameter name="type">ogr</Parameter>
-            <Parameter name="file">{osm_file}</Parameter>
-            <Parameter name="layer">multipolygons</Parameter>
+            <Parameter name="type">shape</Parameter>
+            <Parameter name="file">{land_file}</Parameter>
         </Datasource>
     </Layer>
 
@@ -724,14 +852,7 @@ def create_default_nautical_style(output_path: str, osm_data: str = None,
         </Datasource>
     </Layer>
 
-    <Layer name="seamark" srs="+proj=longlat +datum=WGS84">
-        <StyleName>seamark</StyleName>
-        <Datasource>
-            <Parameter name="type">ogr</Parameter>
-            <Parameter name="file">{osm_file}</Parameter>
-            <Parameter name="layer">points</Parameter>
-        </Datasource>
-    </Layer>
+    <!-- Seamarks layer removed - using OpenSeaMap tile overlay instead -->
 
     <Layer name="peaks" srs="+proj=longlat +datum=WGS84">
         <StyleName>peaks</StyleName>
@@ -767,6 +888,66 @@ def create_default_nautical_style(output_path: str, osm_data: str = None,
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text(style_xml)
     return str(output_file)
+
+
+def generate_preview(center_lat: float, center_lon: float, radius_nm: float,
+                     zoom: int, output_file: str, renderer, tile_size: int = 256,
+                     add_seamark: bool = True):
+    """
+    Generate a single preview PNG image showing the map area.
+
+    Args:
+        center_lat, center_lon: Center coordinates
+        radius_nm: Radius in nautical miles
+        zoom: Zoom level for preview
+        output_file: Path to save preview PNG
+        renderer: MapnikRenderer instance
+        tile_size: Size of each tile
+        add_seamark: Add OpenSeaMap seamark overlay
+    """
+    tiles = get_tiles_in_radius(center_lat, center_lon, radius_nm, zoom)
+    if not tiles:
+        print("No tiles in range for preview")
+        return
+
+    # Find tile bounds
+    min_x = min(t[0] for t in tiles)
+    max_x = max(t[0] for t in tiles)
+    min_y = min(t[1] for t in tiles)
+    max_y = max(t[1] for t in tiles)
+
+    width = (max_x - min_x + 1) * tile_size
+    height = (max_y - min_y + 1) * tile_size
+
+    print(f"Generating preview: {width}x{height} pixels ({len(tiles)} tiles)")
+    if add_seamark:
+        print("  (with OpenSeaMap seamark overlay)")
+
+    # Create composite image
+    preview = Image.new('RGBA', (width, height), (158, 212, 230, 255))  # Water color
+
+    for i, (x, y, z) in enumerate(tiles):
+        print(f"  [{i+1}/{len(tiles)}] Rendering tile {z}/{x}/{y}...", end=" ")
+        try:
+            tile_img = renderer.render_tile(x, y, z)
+
+            # Add OpenSeaMap seamark overlay
+            if add_seamark:
+                seamark_url = SEAMARK_TILE_URL.format(z=z, x=x, y=y)
+                seamark_tile = download_tile(seamark_url)
+                tile_img = composite_tiles(tile_img, seamark_tile)
+
+            # Calculate position in composite
+            px = (x - min_x) * tile_size
+            py = (y - min_y) * tile_size
+            preview.paste(tile_img, (px, py))
+            print("OK")
+        except Exception as e:
+            print(f"ERROR ({e})")
+
+    # Save preview
+    preview.save(output_file, 'PNG')
+    print(f"Preview saved: {output_file}")
 
 
 def image_to_rgb565(img: Image.Image) -> bytes:
@@ -1047,9 +1228,9 @@ OpenSeaMap seamark data, mountain peaks, and place names.
                         help="[mapnik mode] Path to OSM data file (.osm, .osm.pbf)")
     parser.add_argument("--download-data", action="store_true",
                         help="Automatically download OSM data for the area via Overpass API")
-    parser.add_argument("--theme", type=str, choices=["navionics", "dark"],
+    parser.add_argument("--theme", type=str, choices=["navionics", "cm93", "dark", "default"],
                         default="navionics",
-                        help="Color theme for auto-generated style (default: navionics)")
+                        help="Color theme for auto-generated style: navionics (bright blue/brown), cm93 (blue/gray), dark (night mode), default (purple/red)")
 
     # Common options
     parser.add_argument("--no-seamark", action="store_true",
@@ -1058,6 +1239,10 @@ OpenSeaMap seamark data, mountain peaks, and place names.
     # Utility commands
     parser.add_argument("--generate-style", type=str, metavar="FILE",
                         help="Generate a default Mapnik style file and exit")
+    parser.add_argument("--preview", type=str, metavar="FILE",
+                        help="Generate a PNG preview image instead of tiles (mapnik mode only)")
+    parser.add_argument("--preview-zoom", type=int, default=10,
+                        help="Zoom level for preview image (default: 10)")
 
     args = parser.parse_args()
 
@@ -1118,6 +1303,15 @@ OpenSeaMap seamark data, mountain peaks, and place names.
     if args.renderer == "mapnik" and osm_data and osm_data.endswith('.osm'):
         osm_data = convert_osm_to_gpkg(osm_data)
 
+    # Download land polygons for mapnik mode
+    land_shapefile = None
+    if args.renderer == "mapnik":
+        output_path = Path(args.output)
+        output_path.mkdir(parents=True, exist_ok=True)
+        land_shapefile = download_land_polygons(str(output_path))
+        if not land_shapefile:
+            print("Warning: Could not download land polygons. Land may not render correctly.")
+
     # Auto-generate style if using mapnik without explicit style
     style_file = args.style
     if args.renderer == "mapnik" and not style_file:
@@ -1127,7 +1321,7 @@ OpenSeaMap seamark data, mountain peaks, and place names.
 
         # Always regenerate style to ensure it has correct data path
         print(f"Generating {args.theme} style: {style_file}")
-        create_default_nautical_style(style_file, osm_data, theme=args.theme)
+        create_default_nautical_style(style_file, osm_data, theme=args.theme, land_shapefile=land_shapefile)
 
     print(f"\nSaildrop-OS Tile Generator")
     print(f"{'='*50}")
@@ -1146,6 +1340,29 @@ OpenSeaMap seamark data, mountain peaks, and place names.
         print(f"Seamark only: {args.seamark_only}")
 
     print(f"Add seamark overlay: {not args.no_seamark}")
+
+    # Handle preview mode
+    if args.preview:
+        if args.renderer != "mapnik":
+            print("Error: --preview requires --renderer mapnik")
+            sys.exit(1)
+
+        if not MAPNIK_AVAILABLE:
+            print("Error: Mapnik is not installed for preview mode")
+            sys.exit(1)
+
+        print(f"\nGenerating preview at zoom {args.preview_zoom}...")
+        try:
+            renderer = MapnikRenderer(style_file, osm_data)
+            generate_preview(
+                args.lat, args.lon, args.radius,
+                args.preview_zoom, args.preview, renderer,
+                add_seamark=not args.no_seamark
+            )
+        except Exception as e:
+            print(f"Error generating preview: {e}")
+            sys.exit(1)
+        return
 
     generate_tiles(
         center_lat=args.lat,
