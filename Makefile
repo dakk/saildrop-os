@@ -6,9 +6,13 @@
 
 BOARD_FQBN = esp32:esp32:esp32s3
 PORT = /dev/ttyACM0
-PROJECT_DIR = saildrop
+# Sketch to build: APP=radar (naval radar) or another sketch dir.
+# Shared code (hal, boards, drivers, scale, styles, ais, conn) lives in
+# common/ as header-only files, included by sketches via ../common/...
+APP ?= radar
+PROJECT_DIR = $(APP)
 JOBS ?= $(shell nproc)
-BOARD_CONFIG = $(PROJECT_DIR)/board_config.h
+BOARD_CONFIG = common/board_config.h
 ESPTOOL = ~/.arduino15/packages/esp32/tools/esptool_py/5.1.0/esptool
 
 # Board selection: lcd128 (default) or lcd4
@@ -107,6 +111,10 @@ monitor:
 clean:
 	rm -rf $(PROJECT_DIR)/build
 	rm -rf ~/Arduino/libraries/lvgl/src/lv_conf.h
+
+# Host-side unit test for the AIS parser + geo math (no Arduino needed)
+test:
+	g++ -std=c++17 -Wall -o host_test/host_test host_test/host_test.cpp && ./host_test/host_test
 
 # Reset settings (erase NVS partition only)
 # NVS partition is at 0x9000 with size 0x6000 (24KB)
