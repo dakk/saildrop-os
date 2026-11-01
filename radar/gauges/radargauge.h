@@ -20,11 +20,11 @@
 #include <esp_heap_caps.h>
 #endif
 #include "../conf.h"
-#include "../../common/scale.h"
-#include "../../common/geo.h"
-#include "../../common/ais.h"
-#include "../../common/conn.h"
-#include "../../common/coastline.h"
+#include "common/scale.h"
+#include "common/geo.h"
+#include "common/ais.h"
+#include "../conn.h"
+#include "../coastline.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f

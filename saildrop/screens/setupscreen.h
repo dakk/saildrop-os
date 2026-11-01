@@ -17,7 +17,7 @@
 #define SETUPSCREEN_H
 
 #include "screen.h"
-#include "../scale.h"
+#include "common/scale.h"
 
 class SetupScreen : public Screen
 {

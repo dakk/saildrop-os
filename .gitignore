@@ -2,3 +2,5 @@
 ESP32-S3*
 SQEX
 *.pyc
+/radar/common/
+/saildrop/common/

@@ -14,9 +14,9 @@
 #include <esp_system.h>
 #include <esp_heap_caps.h>
 #include <lvgl.h>
-#include "../common/hal.h"
-#include "../common/conn.h"
-#include "../common/geo.h"
+#include "common/hal.h"
+#include "conn.h"
+#include "common/geo.h"
 #include "gauges/radargauge.h"
 
 // LVGL draw buffer (PSRAM on the 4" board, like saildrop)

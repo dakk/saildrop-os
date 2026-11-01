@@ -21,7 +21,7 @@
 #ifdef BOARD_LCD_4
 
 #include <SD_MMC.h>
-#include "boards/boards.h"
+#include "common/boards/boards.h"
 
 static bool sd_initialized = false;
 

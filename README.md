@@ -6,7 +6,7 @@ This repo also contains **`radar/`** — a standalone naval radar showing live
 AIS boats in the Gulf of Cagliari relative to a fixed home position (bottom
 center of the display, stylized coastline instead of a map). Shared toolchain
 code lives in `common/` (header-only), used by both apps. See
-[`radar/README.md`](radar/README.md). Build with `make compile BOARD=lcd4`.
+[`README_RADAR.md`](README_RADAR.md). Build with `make compile APP=radar BOARD=lcd4`.
 
 This is a work in progress project, and currently I'm targeting the Waveshare Esp32 with 1.28 inch touch LCD, connected to an NMEA3WIFI multiplexer using wifi.
 

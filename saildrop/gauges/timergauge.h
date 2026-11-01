@@ -19,8 +19,8 @@
 #include <lvgl.h>
 #include <string.h>
 #include "../conf.h"
-#include "../scale.h"
-#include "styles.h"
+#include "common/scale.h"
+#include "common/gauges/styles.h"
 
 class TimerGauge
 {

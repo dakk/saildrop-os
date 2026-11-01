@@ -23,10 +23,10 @@
 #include <lvgl.h>
 #include <esp_heap_caps.h>
 #include "../data.h"
-#include "../scale.h"
+#include "common/scale.h"
 #include "../tilemgr.h"
 #include "../drivers/sdcard.h"
-#include "styles.h"
+#include "common/gauges/styles.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f

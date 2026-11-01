@@ -13,7 +13,7 @@
 #define CONN_H
 
 #include <WiFi.h>
-#include "ais.h"
+#include "common/ais.h"
 
 #ifndef AIS_RECONNECT_MS
 #define AIS_RECONNECT_MS 5000

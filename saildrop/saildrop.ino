@@ -18,7 +18,7 @@
 #include <Arduino.h>
 #include <esp_system.h>
 #include <lvgl.h>
-#include "hal.h"
+#include "common/hal.h"
 #include "conn.h"
 #include "settings.h"
 #include "wifiportal.h"

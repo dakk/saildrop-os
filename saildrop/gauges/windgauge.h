@@ -19,8 +19,8 @@
 #include <lvgl.h>
 #include <cmath>
 #include "../data.h"
-#include "../scale.h"
-#include "styles.h"
+#include "common/scale.h"
+#include "common/gauges/styles.h"
 
 class WindGauge {
 private:

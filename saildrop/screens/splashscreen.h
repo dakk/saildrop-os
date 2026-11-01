@@ -19,7 +19,7 @@
 #include "screen.h"
 #include "../conn.h"
 #include "../conf.h"
-#include "../scale.h"
+#include "common/scale.h"
 
 class SplashScreen : public Screen {
 private:

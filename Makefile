@@ -6,10 +6,13 @@
 
 BOARD_FQBN = esp32:esp32:esp32s3
 PORT = /dev/ttyACM0
-# Sketch to build: APP=radar (naval radar) or another sketch dir.
-# Shared code (hal, boards, drivers, scale, styles, ais, conn) lives in
-# common/ as header-only files, included by sketches via ../common/...
-APP ?= radar
+# Sketch to build: APP=radar (naval radar) or APP=saildrop (default).
+# Shared code (hal, boards, drivers, scale, styles, ais, geo) lives in
+# common/ as header-only files. arduino-cli compiles a COPY of the sketch in
+# its build dir, so "../common" includes would not resolve; the copy-common
+# target instead copies common/ into the sketch and sketches include it as
+# "common/..." (the sketch root is on the include path).
+APP ?= saildrop
 PROJECT_DIR = $(APP)
 JOBS ?= $(shell nproc)
 BOARD_CONFIG = common/board_config.h
@@ -83,8 +86,14 @@ install-prereq-lcd4:
 	arduino-cli lib install 'GFX Library for Arduino@1.5.3'
 	@echo "Installed ESP32 core 3.3.5 and GFX Library for Arduino 1.5.3"
 
+# Copy shared header-only code into the sketch (see header comment)
+copy-common:
+	@echo "Copying common/ into $(PROJECT_DIR)/common ..."
+	rm -rf $(PROJECT_DIR)/common
+	cp -r common $(PROJECT_DIR)/common
+
 # Compile for selected board
-compile: set-board
+compile: set-board copy-common
 	@echo "Compiling for $(BOARD_NAME)..."
 	@echo "Using LVGL config: $(LV_CONF_FILE)"
 	cp $(LV_CONF_FILE) ~/Arduino/libraries/lvgl/src/lv_conf.h
@@ -110,6 +119,7 @@ monitor:
 # Clean build artifacts
 clean:
 	rm -rf $(PROJECT_DIR)/build
+	rm -rf $(PROJECT_DIR)/common
 	rm -rf ~/Arduino/libraries/lvgl/src/lv_conf.h
 
 # Host-side unit test for the AIS parser + geo math (no Arduino needed)

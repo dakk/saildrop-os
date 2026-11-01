@@ -6,7 +6,7 @@
 
 // Board selection (BOARD_LCD_128 or BOARD_LCD_4) comes from the
 // auto-generated common/board_config.h via the Makefile
-#include "../common/boards/boards.h"
+#include "common/boards/boards.h"
 
 #define DEBUG 1
 #define LVGL_TICK_PERIOD_MS 2
