@@ -110,4 +110,10 @@
 // Memory configuration (use more memory for larger display)
 #define LV_MEM_SIZE_KB  128
 
+// SD Card (MMC 1-bit mode)
+// Reference: https://github.com/waveshareteam/ESP32-S3-Touch-LCD-4/blob/main/examples/Arduino-v3.3.2/examples/10_LVGL_SD/10_LVGL_SD.ino
+#define SD_MMC_CLK_PIN  2
+#define SD_MMC_CMD_PIN  1
+#define SD_MMC_DATA_PIN 4
+
 #endif // BOARD_LCD_4_H

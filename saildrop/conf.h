@@ -47,8 +47,18 @@
 #define SCREEN_WIND       2
 #define SCREEN_COMPASS    3
 #define SCREEN_AIS        4
-#define SCREEN_TACK       5
-#define SCREEN_TIMER      6
+#define SCREEN_TIMER      5
+// #define SCREEN_TACK       5
+
+// Chart screen configuration (only for 4" LCD with SD card)
+#ifdef BOARD_LCD_4
+    #define SCREEN_CHART       6
+    #define CHART_TILE_SIZE    128    // 128x128 pixels per tile
+    #define CHART_CACHE_TILES  9      // 3x3 tile cache (~288KB in PSRAM)
+    #define CHART_MIN_ZOOM     10     // Minimum zoom level (least detail)
+    #define CHART_MAX_ZOOM     14     // Maximum zoom level (most detail)
+    #define CHART_DEFAULT_ZOOM 12     // Default zoom level
+#endif
 
 // #define AP_MODE
 #define AP_SSID "SAILDROP_AP"

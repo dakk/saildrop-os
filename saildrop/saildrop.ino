@@ -50,6 +50,11 @@
 #ifdef SCREEN_TIMER
 #include "screens/timerscreen.h"
 #endif
+#ifdef SCREEN_CHART
+#include "screens/chartscreen.h"
+#include "drivers/sdcard.h"
+static bool sd_card_available = false;
+#endif
 
 // Draw buffer - size defined by board configuration
 // For RGB displays with PSRAM, allocate in PSRAM for larger buffer
@@ -230,13 +235,16 @@ void my_touchpad_read( lv_indev_t * indev, lv_indev_data_t * data )
         if (touchData.gestureID == HAL_GESTURE_SWIPE_LEFT)
         {
             current_screen = (current_screen + num_screens - 1) % num_screens;
-            lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, 100, 0, false);
+            // Use fade animation instead of slide to avoid display tearing on RGB displays
+            // Slide animations require rendering two screens simultaneously which causes issues
+            lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_FADE_IN, 150, 0, false);
             last_handled_gesture_tick = tick;
         }
         else if (touchData.gestureID == HAL_GESTURE_SWIPE_RIGHT)
         {
             current_screen = (current_screen + 1) % num_screens;
-            lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 100, 0, false);
+            // Use fade animation instead of slide to avoid display tearing on RGB displays
+            lv_scr_load_anim(screens[current_screen]->scr, LV_SCR_LOAD_ANIM_FADE_IN, 150, 0, false);
             last_handled_gesture_tick = tick;
         }
         else if (touchData.gestureID == HAL_GESTURE_SWIPE_UP)
@@ -354,29 +362,42 @@ void setup()
     //////////////// Create screens in order defined by conf.h
     Serial.println("LVGL initialized.\nCreating screens...");
 
+    // Initialize SD card for chart screen (must be done before screen creation)
+    #ifdef SCREEN_CHART
+    sd_card_available = sdcard_init();
+    if (sd_card_available) {
+        Serial.println("SD card mounted - ChartScreen enabled");
+    } else {
+        Serial.println("SD card not available - ChartScreen disabled");
+    }
+    #endif
+
     // Screen order array - add screens sorted by their order value
-    struct ScreenEntry { int order; Screen* (*create)(); };
+    struct ScreenEntry { int order; Screen* (*create)(); bool enabled; };
     ScreenEntry entries[] = {
         #ifdef SCREEN_SPEED
-        { SCREEN_SPEED, []() -> Screen* { return new SpeedScreen(); } },
+        { SCREEN_SPEED, []() -> Screen* { return new SpeedScreen(); }, true },
         #endif
         #ifdef SCREEN_WIND
-        { SCREEN_WIND, []() -> Screen* { return new WindScreen(); } },
+        { SCREEN_WIND, []() -> Screen* { return new WindScreen(); }, true },
         #endif
         #ifdef SCREEN_COMPASS
-        { SCREEN_COMPASS, []() -> Screen* { return new CompassScreen(); } },
+        { SCREEN_COMPASS, []() -> Screen* { return new CompassScreen(); }, true },
         #endif
         #ifdef SCREEN_VALUES
-        { SCREEN_VALUES, []() -> Screen* { return new ValuesScreen(); } },
+        { SCREEN_VALUES, []() -> Screen* { return new ValuesScreen(); }, true },
         #endif
         #ifdef SCREEN_AIS
-        { SCREEN_AIS, []() -> Screen* { return new AISScreen(); } },
+        { SCREEN_AIS, []() -> Screen* { return new AISScreen(); }, true },
         #endif
         #ifdef SCREEN_TACK
-        { SCREEN_TACK, []() -> Screen* { return new TackScreen(); } },
+        { SCREEN_TACK, []() -> Screen* { return new TackScreen(); }, true },
         #endif
         #ifdef SCREEN_TIMER
-        { SCREEN_TIMER, []() -> Screen* { return new TimerScreen(); } },
+        { SCREEN_TIMER, []() -> Screen* { return new TimerScreen(); }, true },
+        #endif
+        #ifdef SCREEN_CHART
+        { SCREEN_CHART, []() -> Screen* { return new ChartScreen(); }, sd_card_available },
         #endif
     };
 
@@ -392,9 +413,11 @@ void setup()
         }
     }
 
-    // Add screens in sorted order
+    // Add screens in sorted order (skip disabled screens)
     for (int i = 0; i < n_entries; i++) {
-        add_screen(entries[i].create());
+        if (entries[i].enabled) {
+            add_screen(entries[i].create());
+        }
     }
 
     current_screen = 0;
