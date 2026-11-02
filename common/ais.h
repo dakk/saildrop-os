@@ -39,6 +39,8 @@
 #endif
 
 #define AIS_TARGET_TIMEOUT_MS 180000  // 3 minutes stale timeout
+#define AIS_HIST 6                     // trail points kept per target
+#define AIS_HIST_INTERVAL_MS 10000     // min spacing between trail points
 
 // Gulf of Cagliari bounding box (microdegrees); override in conf.h
 #ifndef AIS_BBOX_LAT_MIN
@@ -60,6 +62,11 @@ struct ais_target {
     uint8_t ship_type;      // AIS ship type code 0-99, 255 = unknown (from type 5 / 24B)
     char name[21];          // from type 5 / 24, may be empty
     uint32_t last_update;   // millis()
+    // trail history ring (oldest at hist_head - hist_count)
+    int32_t hist_lat[AIS_HIST], hist_lon[AIS_HIST];
+    uint8_t hist_head;      // next write position
+    uint8_t hist_count;
+    uint32_t last_hist;     // millis() of last recorded trail point
     bool valid;
 };
 
@@ -262,6 +269,7 @@ public:
         int slot = find_or_create_slot(mmsi);
         if (slot < 0) return;
         ais_target &t = targets[slot];
+        if (t.mmsi != mmsi) { t.hist_count = 0; t.hist_head = 0; t.last_hist = 0; }
         t.mmsi = mmsi;
         t.lat = lat;
         t.lon = lon;
@@ -273,6 +281,7 @@ public:
         t.last_update = millis();
         t.valid = true;
         if (name) strncpy(t.name, name, sizeof(t.name) - 1);
+        hist_push(t, lat, lon);  // demo mode: record every update
     }
 
 private:
@@ -330,6 +339,14 @@ private:
         return -1;
     }
 
+    void hist_push(ais_target &t, int32_t lat, int32_t lon) {
+        t.hist_lat[t.hist_head] = lat;
+        t.hist_lon[t.hist_head] = lon;
+        t.hist_head = (t.hist_head + 1) % AIS_HIST;
+        if (t.hist_count < AIS_HIST) t.hist_count++;
+        t.last_hist = millis();
+    }
+
     int find_or_create_slot(uint32_t mmsi) {
         int oldest_slot = -1;
         uint32_t oldest_time = UINT32_MAX;
@@ -378,6 +395,11 @@ private:
         if (slot < 0) return;
 
         ais_target &t = targets[slot];
+        if (t.mmsi != mmsi) {  // (re)used slot: drop the previous vessel's trail
+            t.hist_count = 0;
+            t.hist_head = 0;
+            t.last_hist = 0;
+        }
         t.mmsi = mmsi;
         t.lat = lat;
         t.lon = lon;
@@ -388,6 +410,9 @@ private:
         t.class_b = class_b ? 1 : 0;
         t.last_update = millis();
         t.valid = true;
+        uint32_t now = millis();
+        if (t.hist_count == 0 || now - t.last_hist >= AIS_HIST_INTERVAL_MS)
+            hist_push(t, lat, lon);
 
         AIS_LOG("AIS: MMSI=%lu lat=%.5f lon=%.5f COG=%.1f SOG=%.1f%s%s\n",
                 (unsigned long)mmsi, lat * 1e-6f, lon * 1e-6f, cog / 10.0f, sog / 10.0f,

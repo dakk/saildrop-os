@@ -105,6 +105,20 @@ public:
         lv_obj_set_style_text_font(range_label, ui_scale::font_small(), 0);
         lv_obj_set_style_text_color(range_label, lv_color_hex(0x9fb8a8), 0);
 
+        // vessel name labels (moving ships only, nearest first); tiny font
+        for (int i = 0; i < 6; i++) {
+            name_label[i] = lv_label_create(bg);
+            lv_obj_set_style_text_font(name_label[i],
+#if SCREEN_MIN_DIM <= 280
+                &lv_font_montserrat_10,
+#else
+                &lv_font_montserrat_14,
+#endif
+                0);
+            lv_obj_set_style_text_color(name_label[i], lv_color_hex(0xcfd8d3), 0);
+            lv_obj_add_flag(name_label[i], LV_OBJ_FLAG_HIDDEN);
+        }
+
         set_range(2);  // default 20 NM
         memset(bg_buf, 0, (size_t)stride * h);
         draw_static();
@@ -145,6 +159,7 @@ private:
     lv_obj_t *canvas;
     lv_obj_t *house_label, *status_label, *info_label, *range_label;
     lv_obj_t *ring_label[4];
+    lv_obj_t *name_label[6];  // vessel names at closest range
     uint8_t *bg_buf = nullptr;     // canvas buffer (static picture + blips)
     uint8_t *bg_static = nullptr;  // pristine copy of the static picture
     uint32_t stride = 0;
@@ -366,7 +381,7 @@ private:
         lv_area_t rects[RADAR_MAX_RECTS];
         int nrects = 0;
 
-        // restore previously drawn blip areas from the pristine static layer
+        // restore previously drawn blip/trail areas from the pristine static layer
         for (int i = 0; i < prev_rect_count; i++) restore_rect(&prev_rects[i]);
 
         for (int i = 0; i < AIS_MAX_TARGETS; i++) {
@@ -389,36 +404,56 @@ private:
                          : (uint8_t)(255 - (255 - 76) * (age - 30000) / 150000);
             if (offscale) fade /= 3;
 
-            // closest approach to the house: highlight vessels that will pass
-            // within 0.5 NM of the house in the next 15 min (fixed origin, so no
-            // collision semantics - just "how close will it pass by")
+            // closest approach to the house: red if it will pass close soon
             float cpa_nm, tcpa_h;
             geo_cpa(HOME_LAT, HOME_LON, t->lat, t->lon, t->cog / 10.0f, t->sog / 10.0f, cpa_nm, tcpa_h);
             bool alert = (tcpa_h > 0.0f && tcpa_h < 0.25f && cpa_nm < 0.5f);
 
-            // blip color = vessel type color (oceanook palette); red if it will
-            // pass close to the house soon
             uint16_t base = alert ? lv_color_to_u16(lv_color_hex(0xff5050))
                                   : lv_color_to_u16(lv_color_hex(ais_ship_type_color(t->ship_type)));
             uint16_t col = lerp565(c_sea, base, fade);
 
-            // moving: filled triangle pointing along COG; stationary: circle outline
+            // bounding box over trail + blip (for area invalidation)
+            float minx = cx, maxx = cx, miny = cy, maxy = cy;
+
+            // trail: fading polyline through the recorded positions, oldest first
+            if (t->hist_count > 1) {
+                int oldest = (t->hist_head - t->hist_count + AIS_HIST) % AIS_HIST;
+                float px_prev = 0, py_prev = 0;
+                for (int k = 0; k < t->hist_count; k++) {
+                    int idx = (oldest + k) % AIS_HIST;
+                    float hx, hy;
+                    geo_project(t->hist_lat[idx], t->hist_lon[idx], proj, hx, hy);
+                    if (hx < minx) minx = hx; if (hx > maxx) maxx = hx;
+                    if (hy < miny) miny = hy; if (hy > maxy) maxy = hy;
+                    if (k > 0) {
+                        uint8_t seg_fade = (uint8_t)(40 + 160 * k / (t->hist_count - 1));
+                        if (offscale) seg_fade /= 3;
+                        line(px_prev, py_prev, hx, hy, lerp565(c_sea, col, seg_fade), SCALE_PX(1));
+                    }
+                    px_prev = hx; py_prev = hy;
+                }
+            }
+
+            // icon: moving = filled triangle along COG; stationary = tiny filled circle
             bool moving = (t->nav_status != 1 && t->nav_status != 5 && t->sog >= 4);
             if (moving) {
                 float deg = (t->cog < 3600 ? t->cog / 10.0f : 0.0f) - RADAR_UP_BEARING;
                 float sa = deg * (float)M_PI / 180.0f;
                 float ca = cosf(sa), sn = sinf(sa);
-                float L = SCALE_PX(7), HW = SCALE_PX(4);   // triangle length / half-base
+                float L = SCALE_PX(7), HW = SCALE_PX(4);
                 float lx[3] = { 0, -HW, HW };
                 float ly[3] = { L, -L * 0.6f, -L * 0.6f };
                 float fx[3], fy[3];
                 for (int i = 0; i < 3; i++) {
                     fx[i] = cx + lx[i] * ca + ly[i] * sn;
                     fy[i] = cy - ly[i] * ca + lx[i] * sn;
+                    if (fx[i] < minx) minx = fx[i]; if (fx[i] > maxx) maxx = fx[i];
+                    if (fy[i] < miny) miny = fy[i]; if (fy[i] > maxy) maxy = fy[i];
                 }
                 fill_polygon(fx, fy, 3, col);
             } else {
-                fill_circle(cx, cy, SCALE_PX(4), col);  // stationary: tiny filled circle
+                fill_circle(cx, cy, SCALE_PX(4), col);
             }
 
             if (i == selected) {
@@ -432,14 +467,40 @@ private:
             }
 
             if (nrects < RADAR_MAX_RECTS) {
-                lv_area_t r = { (int32_t)cx - SCALE_PX(17), (int32_t)cy - SCALE_PX(17),
-                                (int32_t)cx + SCALE_PX(17), (int32_t)cy + SCALE_PX(17) };
+                lv_area_t r = { (int32_t)minx - SCALE_PX(4), (int32_t)miny - SCALE_PX(4),
+                                (int32_t)maxx + SCALE_PX(4), (int32_t)maxy + SCALE_PX(4) };
                 clamp_area(&r, w, h);
                 if (r.x2 >= r.x1 && r.y2 >= r.y1) rects[nrects++] = r;
             }
         }
 
-        // invalidate only blip areas (old + new), never the whole canvas
+        // name labels next to the nearest named MOVING vessels (all ranges)
+        int shown = 0;
+        {
+            const ais_target *near[6];
+            float ndist[6];
+            for (int i = 0; i < AIS_MAX_TARGETS && shown < 6; i++) {
+                const ais_target *t = ais->get_target(i);
+                if (!t->valid || !t->name[0]) continue;
+                float d = geo_distance_nm(HOME_LAT, HOME_LON, t->lat, t->lon);
+                if (d > RANGES_NM[range_index]) continue;
+                bool moving = (t->nav_status != 1 && t->nav_status != 5 && t->sog >= 4);
+                if (!moving) continue;
+                int pos = shown;
+                while (pos > 0 && ndist[pos - 1] > d) { ndist[pos] = ndist[pos - 1]; near[pos] = near[pos - 1]; pos--; }
+                ndist[pos] = d; near[pos] = t; shown++;
+            }
+            for (int k = 0; k < shown; k++) {
+                float nx, ny;
+                geo_project(near[k]->lat, near[k]->lon, proj, nx, ny);
+                lv_label_set_text(name_label[k], near[k]->name);
+                lv_obj_set_pos(name_label[k], (int32_t)nx + SCALE_PX(10), (int32_t)ny - SCALE_PX(5));
+                lv_obj_remove_flag(name_label[k], LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+        for (int k = shown; k < 6; k++) lv_obj_add_flag(name_label[k], LV_OBJ_FLAG_HIDDEN);
+
+        // invalidate only blip/trail areas (old + new), never the whole canvas
         for (int i = 0; i < prev_rect_count; i++) lv_obj_invalidate_area(canvas, &prev_rects[i]);
         for (int i = 0; i < nrects; i++) lv_obj_invalidate_area(canvas, &rects[i]);
         memcpy(prev_rects, rects, nrects * sizeof(lv_area_t));

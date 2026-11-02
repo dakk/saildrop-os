@@ -64,8 +64,15 @@ int main() {
     lv_obj_invalidate(lv_scr_act());
     lv_refr_now(NULL);
 
-    // inject one fake cargo target mid-gulf so blips render too
-    get_ais_manager()->debug_inject(247000001, 39050000, 9200000, 1350, 120, 511, "TESTBOAT", 70, 5);
+    // moored unnamed cargo target ~3 NM out (circle icon check)
+    // + moving named target twice (trail + name + info checks)
+    int32_t tlat, tlon, tlat2, tlon2, tlat3, tlon3;
+    geo_destination(HOME_LAT, HOME_LON, 195.0f, 3.0f, tlat, tlon);
+    geo_destination(HOME_LAT, HOME_LON, 195.0f, 2.6f, tlat2, tlon2);
+    geo_destination(HOME_LAT, HOME_LON, 195.0f, 2.2f, tlat3, tlon3);
+    get_ais_manager()->debug_inject(247000001, tlat, tlon, 1950, 0, 511, "", 70, 5);          // moored
+    get_ais_manager()->debug_inject(247000002, tlat2, tlon2, 1950, 120, 511, "TESTBOAT", 70, 0); // moving
+    get_ais_manager()->debug_inject(247000002, tlat3, tlon3, 1950, 120, 511, "TESTBOAT", 70, 0); // trail pt
 
     // run ~1 s of LVGL time
     for (int i = 0; i < 500; i++) {
@@ -87,9 +94,12 @@ int main() {
     uint32_t n_blip = count_color(blip);
     uint32_t n_black = count_color(0x0000);
 
+    // at 20 NM the moving named ship IS labeled (names only for moving ships)
+    bool shown_at_20 = !lv_obj_has_flag(radar.name_label[0], LV_OBJ_FLAG_HIDDEN);
+
     // exercise range switching (what a swipe triggers) and verify it repaints
     uint32_t ring_before = count_color(lv_color_to_u16(lv_color_hex(0x8b1a1a)));
-    radar.cycle_range();  // 20 -> 40 NM
+    radar.cycle_range();  // 20 -> 5 NM
     for (int i = 0; i < 50; i++) { g_millis += 2; lv_tick_inc(2); lv_timer_handler(); }
     uint32_t ring_after = count_color(lv_color_to_u16(lv_color_hex(0x8b1a1a)));
     printf("ring px before/after 4x cycle_range: %u -> %u\n", ring_before, ring_after);
@@ -109,11 +119,28 @@ int main() {
 
     int fails = 0;
     #define NEED(cond, ...) do { if (!(cond)) { fails++; printf("FAIL: "); printf(__VA_ARGS__); printf("\n"); } else { printf("ok:   "); printf(__VA_ARGS__); printf("\n"); } } while (0)
+    NEED(shown_at_20, "moving ship named at 20 NM");
     NEED(n_sea > 50000, "sea filled (%u px)", n_sea);
     NEED(n_land > 5000, "coastline land drawn (%u px)", n_land);
     NEED(n_ring > 500, "range rings drawn (%u px)", n_ring);
     NEED(n_sweep == 0, "no sweep line (%u px, want 0)", n_sweep);
-    NEED(n_blip > 100, "stationary circle icon drawn (%u px)", n_blip);  // Moored target: circle outline
+    NEED(n_blip > 100, "stationary circle icon drawn (%u px)", n_blip);  // Moored target: filled dot
+    // trail: greenish (not exact-color) pixels beyond the icon itself
+    {
+        uint32_t n_trail = 0;
+        for (int i = 0; i < W * H; i++) {
+            uint16_t c = fb[i];
+            int r = (c >> 11) & 31, g = (c >> 5) & 63, b = c & 31;
+            if (g > 20 && g > r + 4 && g > b + 4 && c != blip) n_trail++;
+        }
+        const ais_target *tt = nullptr;
+        for (int i = 0; i < AIS_MAX_TARGETS; i++) {
+            const ais_target *x = get_ais_manager()->get_target(i);
+            if (x->valid && x->mmsi == 247000002) tt = x;
+        }
+        NEED(tt && tt->hist_count == 2, "trail history recorded (hist_count=%d)", tt ? tt->hist_count : -1);
+        NEED(n_trail > 20, "trail segment drawn (%u faded px)", n_trail);
+    }
     NEED(n_black < W * H / 2, "screen not mostly black (black=%u)", n_black);
     NEED(ring_after != ring_before && ring_after > 100, "cycle_range repaints rings (%u -> %u)", ring_before, ring_after);
 
@@ -122,7 +149,7 @@ int main() {
         const ais_target *t = nullptr;
         for (int i = 0; i < AIS_MAX_TARGETS; i++) {
             const ais_target *x = get_ais_manager()->get_target(i);
-            if (x->valid && x->mmsi == 247000001) t = x;
+            if (x->valid && x->mmsi == 247000002) t = x;
         }
         float bx, by;
         geo_project(t->lat, t->lon, radar.proj, bx, by);
@@ -132,9 +159,9 @@ int main() {
         printf("info label: '%s'\n", txt);
         NEED(strstr(txt, "TESTBOAT") != nullptr, "info shows name");
         NEED(strstr(txt, "12.0kn") != nullptr, "info shows speed as 12.0kn (got '%s')", txt);
-        NEED(strstr(txt, "135deg") != nullptr, "info shows cog 135deg");
+        NEED(strstr(txt, "195deg") != nullptr, "info shows cog 195deg");
         NEED(strstr(txt, "Cargo") != nullptr, "info shows ship type Cargo");
-        NEED(strstr(txt, "Moored") != nullptr, "info shows nav status Moored");
+        NEED(strstr(txt, "Under way using engine") != nullptr, "info shows nav status");
         bool ascii_ok = true;
         for (const char *p = txt; *p; p++) if ((unsigned char)*p >= 128) ascii_ok = false;
         NEED(ascii_ok, "info label is pure ASCII (no tofu glyphs): '%s'", txt);
@@ -148,6 +175,14 @@ int main() {
         printf("status label: '%s'\n", st);
         NEED(strncmp(st, "AIS ", 4) == 0 && strstr(st, "ships - ") != nullptr && strstr(st, "msg/m") != nullptr,
              "status line is 'AIS X ships - Y msg/m' (got '%s')", st);
+    }
+
+    // name label shown at 5 NM (we cycled to it above)
+    {
+        bool vis = !lv_obj_has_flag(radar.name_label[0], LV_OBJ_FLAG_HIDDEN);
+        const char *nt = lv_label_get_text(radar.name_label[0]);
+        printf("name label: '%s' visible=%d\n", nt, vis);
+        NEED(vis && strcmp(nt, "TESTBOAT") == 0, "name label TESTBOAT visible at 5 NM");
     }
 
     // ring labels centered on the rings at the up axis
