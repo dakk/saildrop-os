@@ -38,6 +38,7 @@
 #define RADAR_FG_PERIOD_MS 250       // blip layer poll
 #define RADAR_MAX_POLY 1200          // coastline ring capacity (static buffers, not stack)
 #define RADAR_MAX_RECTS 40           // blip rects tracked for area invalidation
+#define RADAR_FULL_REFRESH_MS 30000  // periodic full repaint, self-heals any stuck band
 
 class RadarGauge {
 public:
@@ -172,6 +173,7 @@ private:
     geo_projection proj;
 
     uint32_t last_status_ms = 0;
+    uint32_t last_full_refresh = 0;
     int selected = -1;
     uint32_t fg_signature = 0;
     lv_area_t prev_rects[RADAR_MAX_RECTS];
@@ -493,8 +495,13 @@ private:
             for (int k = 0; k < shown; k++) {
                 float nx, ny;
                 geo_project(near[k]->lat, near[k]->lon, proj, nx, ny);
+                // clamp exactly like the blip icon, so the name never detaches
+                int m = SCALE_PX(6);
+                if (nx < m) nx = m; if (nx > w - m) nx = w - m;
+                if (ny < m) ny = m; if (ny > h - m) ny = h - m;
                 lv_label_set_text(name_label[k], near[k]->name);
-                lv_obj_set_pos(name_label[k], (int32_t)nx + SCALE_PX(10), (int32_t)ny - SCALE_PX(5));
+                lv_obj_set_pos(name_label[k], (int32_t)nx + SCALE_PX(10),
+                                              (int32_t)ny - SCALE_PX(5));
                 lv_obj_remove_flag(name_label[k], LV_OBJ_FLAG_HIDDEN);
             }
         }
@@ -562,6 +569,14 @@ private:
         if (sig != fg_signature) {
             fg_signature = sig;
             redraw_blips();
+        }
+
+        // periodic full repaint: if a flush ever left a band misplaced in a
+        // static region, this heals it (static areas otherwise only repaint
+        // on range change)
+        if (now - last_full_refresh > RADAR_FULL_REFRESH_MS) {
+            last_full_refresh = now;
+            lv_obj_invalidate(bg);
         }
 
         if (now - last_status_ms > 500) {
