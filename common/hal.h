@@ -38,6 +38,7 @@
 #if DISPLAY_DRIVER_RGB
     #include <Arduino_GFX_Library.h>
     #include <Wire.h>
+    #include <esp_cache.h>
 #endif
 
 // Unified touch data structure
@@ -310,11 +311,19 @@ void HAL::rgb_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_ma
         return;
     }
 
-    uint32_t w = (area->x2 - area->x1 + 1);
-    uint32_t h = (area->y2 - area->y1 + 1);
-
-    // Use Arduino_GFX to draw the bitmap
-    hal_inst->_gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
+    // The RGB panel is continuously scanned from its own framebuffer, so the
+    // flush must be a fast block copy + one cache writeback per row.
+    // (draw16bitRGBBitmap writes pixel-by-pixel with a cache writeback each,
+    // which takes so long that the panel shows a half-updated frame.)
+    Arduino_RGB_Display *gfx = (Arduino_RGB_Display*)hal_inst->_gfx;
+    uint16_t *fb = gfx->getFramebuffer();          // pitch == SCREEN_WIDTH (offsets are 0)
+    int32_t w = area->x2 - area->x1 + 1;
+    int32_t h = area->y2 - area->y1 + 1;
+    uint16_t *dst = fb + (uint32_t)area->y1 * SCREEN_WIDTH + area->x1;
+    for (int32_t j = 0; j < h; j++) {
+        memcpy(dst + (uint32_t)j * SCREEN_WIDTH, px_map + (uint32_t)j * w * 2, (size_t)w * 2);
+        Cache_WriteBack_Addr((uint32_t)(dst + (uint32_t)j * SCREEN_WIDTH), (uint32_t)w * 2);
+    }
 
     lv_display_flush_ready(disp);
 }

@@ -19,10 +19,13 @@
 #include "common/geo.h"
 #include "gauges/radargauge.h"
 
-// LVGL draw buffer (PSRAM on the 4" board, like saildrop)
-#if defined(USE_PSRAM_BUFFER) && USE_PSRAM_BUFFER && defined(BOARD_LCD_4)
+// LVGL draw buffer. On the 4" RGB board use a FULL-screen buffer in PSRAM:
+// PARTIAL mode with a full-size buffer renders each frame in a single flush
+// (no multi-chunk band-shift tearing, and no flicker since rendering happens
+// in RAM, not in the scanned panel framebuffer).
+#if defined(BOARD_LCD_4)
+    #define DRAW_BUF_ALLOC_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT * (LV_COLOR_DEPTH / 8))
     static uint8_t* draw_buf = nullptr;
-    #define DRAW_BUF_ALLOC_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
 #else
     #define DRAW_BUF_ALLOC_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
     static uint32_t draw_buf[DRAW_BUF_ALLOC_SIZE / 4];
@@ -138,9 +141,9 @@ void setup() {
 
     hal().begin();
 
-#if defined(USE_PSRAM_BUFFER) && USE_PSRAM_BUFFER && defined(BOARD_LCD_4)
+#if defined(BOARD_LCD_4)
     draw_buf = (uint8_t*)heap_caps_malloc(DRAW_BUF_ALLOC_SIZE, MALLOC_CAP_SPIRAM);
-    if (!draw_buf) draw_buf = (uint8_t*)malloc(SCREEN_WIDTH * SCREEN_HEIGHT / 20 * (LV_COLOR_DEPTH / 8));
+    if (!draw_buf) draw_buf = (uint8_t*)malloc(DRAW_BUF_ALLOC_SIZE);
     if (draw_buf) memset(draw_buf, 0, DRAW_BUF_ALLOC_SIZE);
 #endif
 

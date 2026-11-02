@@ -147,6 +147,15 @@ The parser was additionally validated against the real recording in
   screen). `radargauge.h` therefore rasterizes directly into the canvas buffers.
 - **Canvas objects are not sized from their buffer in 9.3** — always
   `lv_obj_set_size(canvas, w, h)` after `lv_canvas_set_buffer`.
+- **RGB panel (lcd4) glitches (bands shifted vertically)**: the ST7701 is
+  continuously scanned from its own framebuffer, and the stock
+  `draw16bitRGBBitmap` flush writes pixel-by-pixel with a cache writeback each
+  — a full frame takes so long that the panel shows a half-updated image.
+  `HAL::rgb_flush_cb` (common/hal.h) instead memcpy's each row into the panel
+  framebuffer with one `Cache_WriteBack_Addr` per row. On top of that the
+  radar uses a **full-screen PSRAM draw buffer** (PARTIAL mode, one flush per
+  frame, rendered in RAM — no flicker) and area-only invalidation of the blip
+  layer.
 - **`LV_DRAW_SW_SUPPORT_ARGB8888` must be 1** for a transparent overlay canvas
   to composite over the RGB565 display — enabled in both `lv_conf_lcd*.h`.
 
