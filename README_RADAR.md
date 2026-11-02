@@ -12,8 +12,8 @@ the screen. No map tiles — a stylized coastline silhouette
    │  status: AIS 12 tgts · FEED OK │
    │        ◠  range rings          │
    │      ◠   ·  ← blip + COG vector│
-   │    ◠  sweep ─╮                 │
-   │   ◠       ╱                    │
+   │    ◠                           │
+   │   ◠                            │
    │  coastline silhouette (land)   │
    │            🏠 house (bottom    │
    │  info: NAME ...│   center)     │
@@ -116,9 +116,9 @@ make monitor                         # serial log (115200)
   - *bg* (RGB565, redrawn only on range change): sea, coastline polygons
     (scanline fill), range rings centered on the house, 30° spokes, house dot,
     north compass
-  - *fg* (ARGB8888 transparent, every 100 ms): sweep line (4 s/rev) with a
-    60° fading phosphor trail, AIS blips (dot + COG vector; amber = Class A,
-    blue = Class B; dim when stale or off-scale), selection box
+  - *fg* (ARGB8888 transparent, every 100 ms): AIS blips only (dot + COG
+    vector; amber = Class A, blue = Class B, red = CPA alert; dim when stale
+    or off-scale), selection box. Range rings are dark red; no sweep/spokes.
 - Projection (`common/geo.h`): bearing/distance from home → rotated by
   `RADAR_UP_BEARING` → screen px; scale = vertical space above the house ÷
   range, so the top of the screen is always `range` NM toward screen-up.
@@ -132,7 +132,7 @@ make test                              # g++ host unit test: AIS decode round-tr
 bash host_test/build_render_test.sh    # builds host_test/render_test: compiles the
                                        # real LVGL 9.3 + radargauge.h on the host
 ./host_test/render_test                # renders 1 s of frames into a framebuffer and
-                                       # asserts sea/coast/rings/sweep/blip pixels;
+                                       # asserts sea/coast/rings(no-sweep)/blip pixels;
                                        # writes host_test/render.ppm
 ```
 
@@ -169,5 +169,5 @@ The parser was additionally validated against the real recording in
   without a lock — a blip can tear for a single frame under heavy traffic.
   Harmless visually; a seqlock can be added if it bothers you.
 - The fg canvas is fully cleared and redrawn every 100 ms; on the 4" board
-  that's ~0.9 MB of PSRAM traffic per frame — if the sweep looks jittery under
+  that's ~0.9 MB of PSRAM traffic per frame — if the blips look jittery under
   load, raise `RADAR_FG_PERIOD_MS`.

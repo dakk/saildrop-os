@@ -73,16 +73,16 @@ int main() {
     }
 
     // exercise range switching (what a swipe triggers) and verify it repaints
-    uint32_t ring_before = count_color(lv_color_to_u16(lv_color_hex(0x1f5c38)));
+    uint32_t ring_before = count_color(lv_color_to_u16(lv_color_hex(0x8b1a1a)));
     radar.cycle_range();  // 20 -> 40 NM
     for (int i = 0; i < 50; i++) { g_millis += 2; lv_tick_inc(2); lv_timer_handler(); }
-    uint32_t ring_after = count_color(lv_color_to_u16(lv_color_hex(0x1f5c38)));
+    uint32_t ring_after = count_color(lv_color_to_u16(lv_color_hex(0x8b1a1a)));
     printf("ring px before/after 4x cycle_range: %u -> %u\n", ring_before, ring_after);
 
     // expected colors (RGB565)
     uint16_t sea   = lv_color_to_u16(lv_color_hex(0x0b1d26));
     uint16_t land  = lv_color_to_u16(lv_color_hex(0x33301f));
-    uint16_t ring  = lv_color_to_u16(lv_color_hex(0x1f5c38));
+    uint16_t ring  = lv_color_to_u16(lv_color_hex(0x8b1a1a));  // dark red
     uint16_t sweep = lv_color_to_u16(lv_color_hex(0x39ff6a));
     uint16_t blip  = lv_color_to_u16(lv_color_hex(0xffb347));
     uint16_t house = lv_color_to_u16(lv_color_hex(0xffb347));
@@ -110,7 +110,7 @@ int main() {
     NEED(n_sea > 50000, "sea filled (%u px)", n_sea);
     NEED(n_land > 5000, "coastline land drawn (%u px)", n_land);
     NEED(n_ring > 500, "range rings drawn (%u px)", n_ring);
-    NEED(n_sweep > 100, "sweep line drawn (%u px)", n_sweep);
+    NEED(n_sweep == 0, "no sweep line (%u px, want 0)", n_sweep);
     NEED(n_blip > 10, "blip drawn (%u px)", n_blip);
     NEED(n_black < W * H / 2, "screen not mostly black (black=%u)", n_black);
     NEED(ring_after != ring_before && ring_after > 100, "cycle_range repaints rings (%u -> %u)", ring_before, ring_after);

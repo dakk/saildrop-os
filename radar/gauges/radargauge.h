@@ -36,10 +36,7 @@
 #define M_PI 3.14159265358979323846f
 #endif
 
-#define RADAR_FG_PERIOD_MS 100       // dynamic layer refresh
-#define RADAR_SWEEP_DEG_PER_S 90.0f  // one revolution in 4 s
-#define RADAR_TRAIL_DEG 60.0f        // phosphor trail length
-#define RADAR_TRAIL_SEGS 20
+#define RADAR_FG_PERIOD_MS 100       // dynamic layer refresh (blips only, no sweep)
 #define RADAR_MAX_POLY 1200  // coastline ring capacity (static buffers, not stack)
 
 class RadarGauge {
@@ -81,7 +78,7 @@ public:
         // ring labels sit between the two canvases
         for (int i = 0; i < 4; i++) {
             ring_label[i] = lv_label_create(bg);
-            lv_obj_set_style_text_color(ring_label[i], lv_color_hex(0x4a7a5c), 0);
+            lv_obj_set_style_text_color(ring_label[i], lv_color_hex(0xa04040), 0);
             lv_obj_set_style_text_font(ring_label[i], ui_scale::font_small(), 0);
         }
 
@@ -121,7 +118,6 @@ public:
 
         set_range(2);  // default 20 NM
         draw_static();
-        last_sweep_ms = millis();
         last_status_ms = 0;
 
         lv_timer_create(tick_cb, RADAR_FG_PERIOD_MS, this);
@@ -167,8 +163,6 @@ private:
     int range_index = 2;
     geo_projection proj;
 
-    float sweep_angle = 0;
-    uint32_t last_sweep_ms = 0;
     uint32_t last_status_ms = 0;
     int selected = -1;
 
@@ -177,7 +171,7 @@ private:
 
     // colors: bg as RGB565, fg as RGBA
     uint16_t c_sea, c_land, c_coast, c_ring;
-    uint8_t c_sweep[4], c_blip[4], c_blip_b[4], c_alert[4], c_house[4], c_north[4];
+    uint8_t c_blip[4], c_blip_b[4], c_alert[4], c_house[4];
 
     static void hex_to_rgba(uint32_t hex, uint8_t out[4]) {
         out[0] = (hex >> 16) & 0xFF;  // r
@@ -341,9 +335,8 @@ private:
         c_sea   = lv_color_to_u16(lv_color_hex(0x0b1d26));
         c_land  = lv_color_to_u16(lv_color_hex(0x33301f));
         c_coast = lv_color_to_u16(lv_color_hex(0x6b7261));
-        c_ring  = lv_color_to_u16(lv_color_hex(0x1f5c38));
+        c_ring  = lv_color_to_u16(lv_color_hex(0x8b1a1a));  // dark red rings
         hex_to_rgba(0xffb347, c_house);
-        hex_to_rgba(0xd06060, c_north);
 
         lv_canvas_fill_bg(bg_canvas, lv_color_hex(0x0b1d26), LV_OPA_COVER);
 
@@ -360,15 +353,6 @@ private:
             lv_snprintf(buf, sizeof(buf), "%d", (int)(range_nm * r / 4.0f));
             lv_label_set_text(ring_label[r - 1], buf);
             lv_obj_set_pos(ring_label[r - 1], origin_x + SCALE_PX(4), origin_y - (int32_t)rr - SCALE_PX(7));
-        }
-
-        // spokes every 30 deg from the house
-        float max_r = sqrtf((float)(w * w + h * h));
-        for (int a = 0; a < 360; a += 30) {
-            float rad = a * (float)M_PI / 180.0f;
-            bg_line(origin_x, origin_y,
-                    origin_x + max_r * sinf(rad), origin_y - max_r * cosf(rad),
-                    c_ring, SCALE_PX(1));
         }
 
         // house dot
@@ -398,30 +382,11 @@ private:
     }
 
     void redraw_fg() {
-        hex_to_rgba(0x39ff6a, c_sweep);
         hex_to_rgba(0xffb347, c_blip);
         hex_to_rgba(0x6ac8ff, c_blip_b);
         hex_to_rgba(0xff5050, c_alert);
 
         memset(fg_buf, 0, (size_t)stride_fg * h);  // all transparent
-
-        float max_r = sqrtf((float)(w * w + h * h));
-
-        // phosphor trail: fading segments behind the sweep line
-        for (int k = RADAR_TRAIL_SEGS; k >= 1; k--) {
-            float a = (sweep_angle - RADAR_TRAIL_DEG * k / RADAR_TRAIL_SEGS) * (float)M_PI / 180.0f;
-            uint8_t rgba[4] = { c_sweep[0], c_sweep[1], c_sweep[2],
-                                (uint8_t)(200 * (RADAR_TRAIL_SEGS - k) / RADAR_TRAIL_SEGS) };
-            fg_line(origin_x, origin_y,
-                    origin_x + max_r * sinf(a), origin_y - max_r * cosf(a),
-                    rgba, SCALE_PX(2));
-        }
-
-        // bright sweep line
-        fg_line(origin_x, origin_y,
-                origin_x + max_r * sinf(sweep_angle * (float)M_PI / 180.0f),
-                origin_y - max_r * cosf(sweep_angle * (float)M_PI / 180.0f),
-                c_sweep, SCALE_PX(3));
 
         // AIS blips
         AISManager *ais = get_ais_manager();
@@ -503,10 +468,6 @@ private:
 
     void update() {
         uint32_t now = millis();
-        float dt = (float)(now - last_sweep_ms);
-        last_sweep_ms = now;
-        sweep_angle = fmodf(sweep_angle + dt * RADAR_SWEEP_DEG_PER_S / 1000.0f, 360.0f);
-
         redraw_fg();
 
         if (now - last_status_ms > 500) {
