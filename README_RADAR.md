@@ -118,11 +118,12 @@ make monitor                         # serial log (115200)
     (scanline fill), range rings centered on the house, 30° spokes, house dot,
     north compass
   - single full-screen RGB565 canvas; blips drawn directly on it (restored
-    from a pristine static copy on change, area-only invalidation). Blip color
-    = vessel type (oceanook.com palette: cargo green, tanker red, passenger
-    blue, fishing orange, sailing/pleasure purple, SAR bright red, ...);
-    red override = close-pass-to-home alert; dim when stale or off-scale.
-    Range rings are dark red; no sweep/spokes.
+    from a pristine static copy on change, area-only invalidation). Moving
+    vessels = filled triangle along COG; stationary (anchor/moored/slow) =
+    circle outline. Blip color = vessel type (oceanook.com palette: cargo
+    green, tanker red, passenger blue, fishing orange, sailing/pleasure
+    purple, SAR bright red, ...); red override = close-pass-to-home alert;
+    dim when stale or off-scale. Range rings are dark red; no sweep/spokes.
 - Projection (`common/geo.h`): bearing/distance from home → rotated by
   `RADAR_UP_BEARING` → screen px; scale = vertical space above the house ÷
   range, so the top of the screen is always `range` NM toward screen-up.

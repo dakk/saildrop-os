@@ -113,7 +113,7 @@ int main() {
     NEED(n_land > 5000, "coastline land drawn (%u px)", n_land);
     NEED(n_ring > 500, "range rings drawn (%u px)", n_ring);
     NEED(n_sweep == 0, "no sweep line (%u px, want 0)", n_sweep);
-    NEED(n_blip > 10, "blip drawn (%u px)", n_blip);  // Moored target: dot only, no course vector
+    NEED(n_blip > 100, "stationary circle icon drawn (%u px)", n_blip);  // Moored target: circle outline
     NEED(n_black < W * H / 2, "screen not mostly black (black=%u)", n_black);
     NEED(ring_after != ring_before && ring_after > 100, "cycle_range repaints rings (%u -> %u)", ring_before, ring_after);
 

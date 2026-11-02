@@ -222,6 +222,13 @@ private:
         }
     }
 
+    void fill_circle(float cx, float cy, float r, uint16_t c) {
+        for (int dy = -(int)r; dy <= (int)r; dy++) {
+            float span = sqrtf(r * r - dy * dy);
+            rect((int32_t)(cx - span), (int32_t)cy + dy, (int32_t)(2 * span) + 1, 1, c);
+        }
+    }
+
     void circle(float cx, float cy, float r, uint16_t c, int width) {
         if (r < 2) return;
         const int segs = 72;
@@ -395,15 +402,23 @@ private:
                                   : lv_color_to_u16(lv_color_hex(ais_ship_type_color(t->ship_type)));
             uint16_t col = lerp565(c_sea, base, fade);
 
-            int bs = SCALE_PX(7);
-            rect((int32_t)cx - bs / 2, (int32_t)cy - bs / 2, bs, bs, col);
-
-            // not moving (at anchor / moored / sog < 0.4kn): no course vector
+            // moving: filled triangle pointing along COG; stationary: circle outline
             bool moving = (t->nav_status != 1 && t->nav_status != 5 && t->sog >= 4);
-            if (moving && t->cog < 3600) {
-                float crad = (t->cog / 10.0f - RADAR_UP_BEARING) * (float)M_PI / 180.0f;
-                line(cx, cy, cx + SCALE_PX(12) * sinf(crad), cy - SCALE_PX(12) * cosf(crad),
-                     col, SCALE_PX(2));
+            if (moving) {
+                float deg = (t->cog < 3600 ? t->cog / 10.0f : 0.0f) - RADAR_UP_BEARING;
+                float sa = deg * (float)M_PI / 180.0f;
+                float ca = cosf(sa), sn = sinf(sa);
+                float L = SCALE_PX(7), HW = SCALE_PX(4);   // triangle length / half-base
+                float lx[3] = { 0, -HW, HW };
+                float ly[3] = { L, -L * 0.6f, -L * 0.6f };
+                float fx[3], fy[3];
+                for (int i = 0; i < 3; i++) {
+                    fx[i] = cx + lx[i] * ca + ly[i] * sn;
+                    fy[i] = cy - ly[i] * ca + lx[i] * sn;
+                }
+                fill_polygon(fx, fy, 3, col);
+            } else {
+                fill_circle(cx, cy, SCALE_PX(4), col);  // stationary: tiny filled circle
             }
 
             if (i == selected) {
