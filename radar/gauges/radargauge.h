@@ -313,7 +313,9 @@ private:
             char buf[8];
             lv_snprintf(buf, sizeof(buf), "%d", (int)(range_nm * r / 4.0f));
             lv_label_set_text(ring_label[r - 1], buf);
-            lv_obj_set_pos(ring_label[r - 1], origin_x + SCALE_PX(4), origin_y - (int32_t)rr - SCALE_PX(7));
+            // center the label exactly on the ring at the screen-up axis
+            lv_obj_align(ring_label[r - 1], LV_ALIGN_CENTER,
+                         origin_x - w / 2, (int32_t)(origin_y - rr) - h / 2);
         }
 
         int hs = SCALE_PX(5);

@@ -136,6 +136,20 @@ int main() {
         NEED(strstr(txt, "fkn") == nullptr, "no broken float format");
     }
 
+    // ring labels centered on the rings at the up axis
+    {
+        for (int r = 1; r <= 4; r++) {
+            lv_obj_t *lbl = radar.ring_label[r - 1];
+            int32_t cx = lv_obj_get_x(lbl) + lv_obj_get_width(lbl) / 2;
+            int32_t cy = lv_obj_get_y(lbl) + lv_obj_get_height(lbl) / 2;
+            float rr = radar.RANGES_NM[radar.range_index] * r / 4.0f * radar.proj.px_per_nm;
+            int32_t want_y = radar.origin_y - (int32_t)rr;
+            printf("ring %d label center (%d,%d), want y=%d x=%d\n", r, cx, cy, want_y, radar.origin_x);
+            NEED(abs(cx - radar.origin_x) <= 2 && abs(cy - want_y) <= 2,
+                 "ring %d label centered on circle", r);
+        }
+    }
+
     // compass rose in the top-right corner: red-ish pixels present there
     uint16_t red = lv_color_to_u16(lv_color_hex(0xff5050));
     uint32_t n_red = 0;
