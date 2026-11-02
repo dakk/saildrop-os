@@ -13,8 +13,8 @@
 #define LOOP_DELAY 2
 
 // --- WiFi (home network the radar connects to) ---
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
 
 // --- AIS feed: raw NMEA (!AIVDM/!AIVDO) over plain TCP ---
 // Point this at your endpoint. For development you can replay the recorded
@@ -22,8 +22,8 @@
 //   python3 tools/serve_testdata.py testdata/ais_29_01_2026.nmea --tcp-port 10110 --interval 0.05
 // For live data, run a small bridge on the LAN that pulls AISHub (or your own
 // receiver) and forwards only sentences inside AIS_BBOX_* below.
-#define AIS_HOST "192.168.1.10"
-#define AIS_PORT 10110
+#define AIS_HOST ""
+#define AIS_PORT 1992
 // Optional line sent right after connecting (e.g. AISHub API key):
 // #define AIS_HELLO "..."
 
