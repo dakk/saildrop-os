@@ -8,6 +8,12 @@
  *     north marker - redrawn only when the range changes
  *   - fg canvas (ARGB8888, transparent): sweep line + phosphor trail + AIS
  *     blips - redrawn every RADAR_FG_PERIOD_MS
+ *
+ * IMPORTANT: all drawing is done by writing the canvas buffers directly.
+ * The LVGL 9.3 layer API (lv_canvas_init_layer + lv_draw_* + finish_layer)
+ * routes through the draw-task dispatcher, which deadlocks when called with
+ * many primitives outside a running dispatch context (observed as a hang in
+ * setup() -> black screen). Direct buffer writes have no such issue.
  */
 #ifndef RADARGAUGE_H
 #define RADARGAUGE_H
@@ -30,10 +36,11 @@
 #define M_PI 3.14159265358979323846f
 #endif
 
-#define RADAR_FG_PERIOD_MS 100     // dynamic layer refresh
+#define RADAR_FG_PERIOD_MS 100       // dynamic layer refresh
 #define RADAR_SWEEP_DEG_PER_S 90.0f  // one revolution in 4 s
-#define RADAR_TRAIL_DEG 60.0f      // phosphor trail length
+#define RADAR_TRAIL_DEG 60.0f        // phosphor trail length
 #define RADAR_TRAIL_SEGS 20
+#define RADAR_MAX_POLY 1200  // coastline ring capacity (static buffers, not stack)
 
 class RadarGauge {
 public:
@@ -67,7 +74,9 @@ public:
 
         bg_canvas = lv_canvas_create(bg);
         lv_canvas_set_buffer(bg_canvas, bg_buf, w, h, LV_COLOR_FORMAT_RGB565);
+        lv_obj_set_size(bg_canvas, w, h);  // 9.3 does not size the obj from the buffer
         lv_obj_set_pos(bg_canvas, 0, 0);
+        stride_bg = lv_draw_buf_width_to_stride(w, LV_COLOR_FORMAT_RGB565);
 
         // ring labels sit between the two canvases
         for (int i = 0; i < 4; i++) {
@@ -78,7 +87,9 @@ public:
 
         fg_canvas = lv_canvas_create(bg);
         lv_canvas_set_buffer(fg_canvas, fg_buf, w, h, LV_COLOR_FORMAT_ARGB8888);
+        lv_obj_set_size(fg_canvas, w, h);  // 9.3 does not size the obj from the buffer
         lv_obj_set_pos(fg_canvas, 0, 0);
+        stride_fg = lv_draw_buf_width_to_stride(w, LV_COLOR_FORMAT_ARGB8888);
 
         // house marker on top of everything
         house_label = lv_label_create(bg);
@@ -95,6 +106,8 @@ public:
 
         info_label = lv_label_create(bg);
         lv_obj_align(info_label, LV_ALIGN_BOTTOM_LEFT, SCALE_PX(6), -SCALE_PX(6));
+        lv_obj_set_width(info_label, SCALE_PX(230));
+        lv_label_set_long_mode(info_label, LV_LABEL_LONG_WRAP);
         lv_obj_set_style_text_font(info_label, ui_scale::font_small(), 0);
         lv_obj_set_style_text_color(info_label, lv_color_hex(0xffd27f), 0);
         lv_label_set_text(info_label, "");
@@ -148,6 +161,7 @@ private:
     lv_obj_t *ring_label[4];
     uint8_t *bg_buf = nullptr;
     uint8_t *fg_buf = nullptr;
+    uint32_t stride_bg = 0, stride_fg = 0;
     int w, h;
     int32_t origin_x, origin_y, top_margin;
 
@@ -161,13 +175,19 @@ private:
     uint32_t last_status_ms = 0;
     int selected = -1;
 
-    static lv_color_t col_sea()    { return lv_color_hex(0x0b1d26); }
-    static lv_color_t col_land()   { return lv_color_hex(0x33301f); }
-    static lv_color_t col_coast()  { return lv_color_hex(0x6b7261); }
-    static lv_color_t col_ring()   { return lv_color_hex(0x1f5c38); }
-    static lv_color_t col_sweep()  { return lv_color_hex(0x39ff6a); }
-    static lv_color_t col_blip()   { return lv_color_hex(0xffb347); }
-    static lv_color_t col_blip_b() { return lv_color_hex(0x6ac8ff); }
+    // polygon scratch buffers (static: too big for the 8 KB loop task stack)
+    float poly_fx[RADAR_MAX_POLY], poly_fy[RADAR_MAX_POLY], poly_xs[RADAR_MAX_POLY];
+
+    // colors: bg as RGB565, fg as RGBA
+    uint16_t c_sea, c_land, c_coast, c_ring;
+    uint8_t c_sweep[4], c_blip[4], c_blip_b[4], c_alert[4], c_house[4], c_north[4];
+
+    static void hex_to_rgba(uint32_t hex, uint8_t out[4]) {
+        out[0] = (hex >> 16) & 0xFF;  // r
+        out[1] = (hex >> 8) & 0xFF;   // g
+        out[2] = hex & 0xFF;          // b
+        out[3] = 255;                 // a
+    }
 
     static void tick_cb(lv_timer_t *timer) {
         RadarGauge *g = static_cast<RadarGauge*>(lv_timer_get_user_data(timer));
@@ -189,102 +209,156 @@ private:
         lv_label_set_text(range_label, buf);
     }
 
-    // project a coastline point to screen px
-    void project_pt(const coast_point &p, float &x, float &y) {
-        geo_project(p.lat, p.lon, proj, x, y);
+    // ---- direct buffer raster helpers (no LVGL draw tasks) ----
+
+    void bg_px(int32_t x, int32_t y, uint16_t c) {
+        if (x < 0 || y < 0 || x >= w || y >= h) return;
+        ((uint16_t*)bg_buf)[y * (stride_bg / 2) + x] = c;
     }
 
-    // scanline fill of a screen-space polygon on the bg canvas
-    void fill_polygon(lv_point_precise_t *pts, int n, lv_color_t color) {
-        if (n < 3) return;
-        float ymin = pts[0].y, ymax = pts[0].y;
-        for (int i = 1; i < n; i++) {
-            if (pts[i].y < ymin) ymin = pts[i].y;
-            if (pts[i].y > ymax) ymax = pts[i].y;
-        }
-        lv_draw_rect_dsc_t dsc;
-        lv_draw_rect_dsc_init(&dsc);
-        dsc.bg_color = color;
-        dsc.bg_opa = LV_OPA_COVER;
-        dsc.radius = 0;
-        dsc.border_width = 0;
+    // alpha-blended pixel on the ARGB8888 fg canvas (straight alpha "over")
+    void fg_px(int32_t x, int32_t y, const uint8_t rgba[4]) {
+        if (x < 0 || y < 0 || x >= w || y >= h) return;
+        uint32_t *p = (uint32_t*)fg_buf + y * (stride_fg / 4) + x;
+        uint32_t d = *p;
+        uint32_t da = (d >> 24) & 0xFF;
+        uint32_t sa = rgba[3];
+        uint32_t oa = sa + (da * (255 - sa)) / 255;
+        if (oa == 0) { *p = 0; return; }
+        uint32_t inv = 255 - sa;
+        uint32_t dr = (d >> 16) & 0xFF, dg = (d >> 8) & 0xFF, db = d & 0xFF;
+        uint32_t r = (rgba[0] * sa * 255 + dr * da * inv) / (oa * 255);
+        uint32_t g = (rgba[1] * sa * 255 + dg * da * inv) / (oa * 255);
+        uint32_t b = (rgba[2] * sa * 255 + db * da * inv) / (oa * 255);
+        *p = (oa << 24) | (r << 16) | (g << 8) | b;
+    }
 
-        float xs[64];
+    void bg_rect(int32_t x, int32_t y, int32_t wd, int32_t ht, uint16_t c) {
+        if (x < 0) { wd += x; x = 0; }
+        if (y < 0) { ht += y; y = 0; }
+        if (x + wd > w) wd = w - x;
+        if (y + ht > h) ht = h - y;
+        if (wd <= 0 || ht <= 0) return;
+        uint16_t *row = (uint16_t*)bg_buf + y * (stride_bg / 2) + x;
+        for (int32_t j = 0; j < ht; j++) {
+            for (int32_t i = 0; i < wd; i++) row[i] = c;
+            row += stride_bg / 2;
+        }
+    }
+
+    void fg_rect(int32_t x, int32_t y, int32_t wd, int32_t ht, const uint8_t rgba[4]) {
+        for (int32_t j = 0; j < ht; j++)
+            for (int32_t i = 0; i < wd; i++)
+                fg_px(x + i, y + j, rgba);
+    }
+
+    // Bresenham line with square brush of size `width`
+    void bg_line(float x1, float y1, float x2, float y2, uint16_t c, int width) {
+        int32_t ix1 = (int32_t)x1, iy1 = (int32_t)y1, ix2 = (int32_t)x2, iy2 = (int32_t)y2;
+        int32_t dx = abs(ix2 - ix1), sx = ix1 < ix2 ? 1 : -1;
+        int32_t dy = -abs(iy2 - iy1), sy = iy1 < iy2 ? 1 : -1;
+        int32_t err = dx + dy;
+        int hw = width / 2;
+        while (true) {
+            bg_rect(ix1 - hw, iy1 - hw, width, width, c);
+            if (ix1 == ix2 && iy1 == iy2) break;
+            int32_t e2 = 2 * err;
+            if (e2 >= dy) { err += dy; ix1 += sx; }
+            if (e2 <= dx) { err += dx; iy1 += sy; }
+        }
+    }
+
+    void fg_line(float x1, float y1, float x2, float y2, const uint8_t rgba[4], int width) {
+        int32_t ix1 = (int32_t)x1, iy1 = (int32_t)y1, ix2 = (int32_t)x2, iy2 = (int32_t)y2;
+        int32_t dx = abs(ix2 - ix1), sx = ix1 < ix2 ? 1 : -1;
+        int32_t dy = -abs(iy2 - iy1), sy = iy1 < iy2 ? 1 : -1;
+        int32_t err = dx + dy;
+        int hw = width / 2;
+        while (true) {
+            fg_rect(ix1 - hw, iy1 - hw, width, width, rgba);
+            if (ix1 == ix2 && iy1 == iy2) break;
+            int32_t e2 = 2 * err;
+            if (e2 >= dy) { err += dy; ix1 += sx; }
+            if (e2 <= dx) { err += dx; iy1 += sy; }
+        }
+    }
+
+    void bg_circle(float cx, float cy, float r, uint16_t c, int width) {
+        if (r < 2) return;
+        const int segs = 72;
+        for (int i = 0; i < segs; i++) {
+            float a0 = i * 2.0f * (float)M_PI / segs;
+            float a1 = (i + 1) * 2.0f * (float)M_PI / segs;
+            bg_line(cx + r * sinf(a0), cy - r * cosf(a0),
+                    cx + r * sinf(a1), cy - r * cosf(a1), c, width);
+        }
+    }
+
+    // scanline fill of a float polygon into the bg buffer
+    void bg_fill_polygon(const float *fx, const float *fy, int n, uint16_t c) {
+        if (n < 3) return;
+        float ymin = fy[0], ymax = fy[0];
+        for (int i = 1; i < n; i++) {
+            if (fy[i] < ymin) ymin = fy[i];
+            if (fy[i] > ymax) ymax = fy[i];
+        }
+        float *xs = poly_xs;
         for (int y = (int)ymin; y <= (int)ymax; y++) {
             int cnt = 0;
             for (int i = 0; i < n; i++) {
-                lv_point_precise_t a = pts[i];
-                lv_point_precise_t b = pts[(i + 1) % n];
-                if ((a.y <= y && b.y > y) || (b.y <= y && a.y > y)) {
-                    float t = (y - a.y) / (b.y - a.y);
-                    if (cnt < 64) xs[cnt++] = a.x + t * (b.x - a.x);
+                float ay = fy[i], by = fy[(i + 1) % n];
+                float ax = fx[i], bx = fx[(i + 1) % n];
+                if ((ay <= y && by > y) || (by <= y && ay > y)) {
+                    float t = (y - ay) / (by - ay);
+                    if (cnt < RADAR_MAX_POLY) xs[cnt++] = ax + t * (bx - ax);
                 }
             }
-            // sort intersections
             for (int i = 0; i < cnt; i++)
                 for (int j = i + 1; j < cnt; j++)
                     if (xs[j] < xs[i]) { float tmp = xs[i]; xs[i] = xs[j]; xs[j] = tmp; }
             for (int i = 0; i + 1 < cnt; i += 2) {
                 int x0 = (int)xs[i], x1 = (int)xs[i + 1];
-                if (x1 > x0) lv_canvas_draw_rect(bg_canvas, x0, y, x1 - x0 + 1, 1, &dsc);
+                if (x1 > x0) bg_rect(x0, y, x1 - x0 + 1, 1, c);
             }
         }
     }
 
-    void draw_polygon_outline(lv_point_precise_t *pts, int n, lv_color_t color, int width) {
-        lv_point_precise_t closed[65];
-        if (n > 64) n = 64;
-        memcpy(closed, pts, n * sizeof(lv_point_precise_t));
-        closed[n] = closed[0];
-        lv_draw_line_dsc_t dsc;
-        lv_draw_line_dsc_init(&dsc);
-        dsc.color = color;
-        dsc.width = width;
-        dsc.opa = LV_OPA_COVER;
-        lv_canvas_draw_line(bg_canvas, closed, n + 1, &dsc);
-    }
-
     void draw_coast(const coast_point *poly, int count) {
-        lv_point_precise_t pts[64];
-        if (count > 64) count = 64;
-        for (int i = 0; i < count; i++)
-            project_pt(poly[i], pts[i].x, pts[i].y);
-        fill_polygon(pts, count, col_land());
-        draw_polygon_outline(pts, count, col_coast(), SCALE_PX(1));
-    }
-
-    void draw_circle(int32_t cx, int32_t cy, float r, lv_color_t color, int width) {
-        if (r < 2) return;
-        lv_point_precise_t pts[73];
-        for (int i = 0; i < 72; i++) {
-            float a = i * 2.0f * (float)M_PI / 72.0f;
-            pts[i].x = cx + r * sinf(a);
-            pts[i].y = cy - r * cosf(a);
+        if (count > RADAR_MAX_POLY) count = RADAR_MAX_POLY;
+        float *fx = poly_fx, *fy = poly_fy;
+        for (int i = 0; i < count; i++) {
+            geo_project(poly[i].lat, poly[i].lon, proj, fx[i], fy[i]);
+            // clamp far off-screen points so the scanline fill stays cheap at
+            // short ranges (bg_rect clips to the buffer anyway)
+            if (fx[i] < -w) fx[i] = -w; else if (fx[i] > 2 * w) fx[i] = 2 * w;
+            if (fy[i] < -h) fy[i] = -h; else if (fy[i] > 2 * h) fy[i] = 2 * h;
         }
-        pts[72] = pts[0];
-        lv_draw_line_dsc_t dsc;
-        lv_draw_line_dsc_init(&dsc);
-        dsc.color = color;
-        dsc.width = width;
-        dsc.opa = LV_OPA_COVER;
-        lv_canvas_draw_line(bg_canvas, pts, 73, &dsc);
+        bg_fill_polygon(fx, fy, count, c_land);
+        for (int i = 0; i < count; i++) {
+            int j = (i + 1) % count;
+            bg_line(fx[i], fy[i], fx[j], fy[j], c_coast, SCALE_PX(1));
+        }
     }
 
     void draw_static() {
-        lv_canvas_fill_bg(bg_canvas, col_sea(), LV_OPA_COVER);
+        c_sea   = lv_color_to_u16(lv_color_hex(0x0b1d26));
+        c_land  = lv_color_to_u16(lv_color_hex(0x33301f));
+        c_coast = lv_color_to_u16(lv_color_hex(0x6b7261));
+        c_ring  = lv_color_to_u16(lv_color_hex(0x1f5c38));
+        hex_to_rgba(0xffb347, c_house);
+        hex_to_rgba(0xd06060, c_north);
 
-        // coastline silhouette
-        draw_coast(COAST_MAIN, COAST_MAIN_COUNT);
-        draw_coast(COAST_SANTANTIOCO, COAST_SANTANTIOCO_COUNT);
-        draw_coast(COAST_SANPIETRO, COAST_SANPIETRO_COUNT);
+        lv_canvas_fill_bg(bg_canvas, lv_color_hex(0x0b1d26), LV_OPA_COVER);
+
+        // coastline silhouette (all rings: mainland + islands)
+        for (int r = 0; r < COAST_RING_COUNT; r++)
+            draw_coast(COAST_RINGS[r], COAST_RING_LENS[r]);
 
         // range rings centered on the house
         float range_nm = RANGES_NM[range_index];
         for (int r = 1; r <= 4; r++) {
             float rr = range_nm * r / 4.0f * proj.px_per_nm;
-            draw_circle(origin_x, origin_y, rr, col_ring(), SCALE_PX(1));
-            // label on the screen-up axis
-            lv_label_set_text(ring_label[r - 1], "");
+            bg_circle(origin_x, origin_y, rr, c_ring, SCALE_PX(1));
             char buf[8];
             lv_snprintf(buf, sizeof(buf), "%d", (int)(range_nm * r / 4.0f));
             lv_label_set_text(ring_label[r - 1], buf);
@@ -293,78 +367,55 @@ private:
 
         // spokes every 30 deg from the house
         float max_r = sqrtf((float)(w * w + h * h));
-        lv_draw_line_dsc_t dsc;
-        lv_draw_line_dsc_init(&dsc);
-        dsc.color = col_ring();
-        dsc.width = SCALE_PX(1);
-        dsc.opa = LV_OPA_40;
         for (int a = 0; a < 360; a += 30) {
             float rad = a * (float)M_PI / 180.0f;
-            lv_point_precise_t pts[2];
-            pts[0].x = origin_x; pts[0].y = origin_y;
-            pts[1].x = origin_x + max_r * sinf(rad);
-            pts[1].y = origin_y - max_r * cosf(rad);
-            lv_canvas_draw_line(bg_canvas, pts, 2, &dsc);
+            bg_line(origin_x, origin_y,
+                    origin_x + max_r * sinf(rad), origin_y - max_r * cosf(rad),
+                    c_ring, SCALE_PX(1));
         }
 
         // house dot
-        lv_draw_rect_dsc_t rdsc;
-        lv_draw_rect_dsc_init(&rdsc);
-        rdsc.bg_color = lv_color_hex(0xffb347);
-        rdsc.bg_opa = LV_OPA_COVER;
-        rdsc.radius = LV_RADIUS_CIRCLE;
-        rdsc.border_width = 0;
         int hs = SCALE_PX(5);
-        lv_canvas_draw_rect(bg_canvas, origin_x - hs / 2, origin_y - hs / 2, hs, hs, &rdsc);
+        bg_rect(origin_x - hs / 2, origin_y - hs / 2, hs, hs, lv_color_to_u16(lv_color_hex(0xffb347)));
 
         // north marker: small compass in the top-right corner, rotated so that
         // true north points in its real screen direction
         int32_t nx = w - SCALE_PX(34), ny = SCALE_PX(34);
-        draw_circle(nx, ny, SCALE_PX(16), lv_color_hex(0xd06060), SCALE_PX(1));
-        float nrad = (0.0f - RADAR_UP_BEARING) * (float)M_PI / 180.0f;  // north screen angle
-        lv_draw_line_dsc_t ndsc;
-        lv_draw_line_dsc_init(&ndsc);
-        ndsc.color = lv_color_hex(0xd06060);
-        ndsc.width = SCALE_PX(2);
-        ndsc.opa = LV_OPA_COVER;
-        lv_point_precise_t npts[2];
-        npts[0].x = nx; npts[0].y = ny;
-        npts[1].x = nx + SCALE_PX(13) * sinf(nrad);
-        npts[1].y = ny - SCALE_PX(13) * cosf(nrad);
-        lv_canvas_draw_line(bg_canvas, npts, 2, &ndsc);
-        lv_obj_set_pos(north_label, (int32_t)npts[1].x - SCALE_PX(4), (int32_t)npts[1].y - SCALE_PX(14));
+        bg_circle(nx, ny, SCALE_PX(16), lv_color_to_u16(lv_color_hex(0xd06060)), SCALE_PX(1));
+        float nrad = (0.0f - RADAR_UP_BEARING) * (float)M_PI / 180.0f;
+        float nex = nx + SCALE_PX(13) * sinf(nrad);
+        float ney = ny - SCALE_PX(13) * cosf(nrad);
+        bg_line(nx, ny, nex, ney, lv_color_to_u16(lv_color_hex(0xd06060)), SCALE_PX(2));
+        lv_obj_set_pos(north_label, (int32_t)nex - SCALE_PX(4), (int32_t)ney - SCALE_PX(14));
+
+        lv_obj_invalidate(bg_canvas);
     }
 
     void redraw_fg() {
-        lv_canvas_fill_bg(fg_canvas, lv_color_hex(0x000000), LV_OPA_TRANSP);
+        hex_to_rgba(0x39ff6a, c_sweep);
+        hex_to_rgba(0xffb347, c_blip);
+        hex_to_rgba(0x6ac8ff, c_blip_b);
+        hex_to_rgba(0xff5050, c_alert);
+
+        memset(fg_buf, 0, (size_t)stride_fg * h);  // all transparent
 
         float max_r = sqrtf((float)(w * w + h * h));
-        lv_draw_line_dsc_t dsc;
-        lv_draw_line_dsc_init(&dsc);
-        dsc.color = col_sweep();
-        dsc.width = SCALE_PX(2);
-        dsc.rounded = true;
 
         // phosphor trail: fading segments behind the sweep line
         for (int k = RADAR_TRAIL_SEGS; k >= 1; k--) {
             float a = (sweep_angle - RADAR_TRAIL_DEG * k / RADAR_TRAIL_SEGS) * (float)M_PI / 180.0f;
-            dsc.opa = (lv_opa_t)(200 * (RADAR_TRAIL_SEGS - k) / RADAR_TRAIL_SEGS);
-            lv_point_precise_t pts[2];
-            pts[0].x = origin_x; pts[0].y = origin_y;
-            pts[1].x = origin_x + max_r * sinf(a);
-            pts[1].y = origin_y - max_r * cosf(a);
-            lv_canvas_draw_line(fg_canvas, pts, 2, &dsc);
+            uint8_t rgba[4] = { c_sweep[0], c_sweep[1], c_sweep[2],
+                                (uint8_t)(200 * (RADAR_TRAIL_SEGS - k) / RADAR_TRAIL_SEGS) };
+            fg_line(origin_x, origin_y,
+                    origin_x + max_r * sinf(a), origin_y - max_r * cosf(a),
+                    rgba, SCALE_PX(2));
         }
 
         // bright sweep line
-        dsc.opa = LV_OPA_COVER;
-        dsc.width = SCALE_PX(3);
-        float a = sweep_angle * (float)M_PI / 180.0f;
-        lv_point_precise_t pts[2];
-        pts[0].x = origin_x; pts[0].y = origin_y;
-        pts[1].x = origin_x + max_r * sinf(a);
-        pts[1].y = origin_y - max_r * cosf(a);
-        lv_canvas_draw_line(fg_canvas, pts, 2, &dsc);
+        fg_line(origin_x, origin_y,
+                origin_x + max_r * sinf(sweep_angle * (float)M_PI / 180.0f),
+                origin_y - max_r * cosf(sweep_angle * (float)M_PI / 180.0f),
+                c_sweep, SCALE_PX(3));
 
         // AIS blips
         AISManager *ais = get_ais_manager();
@@ -386,47 +437,40 @@ private:
 
             // fade with age (stale targets dim out before the 3 min timeout)
             uint32_t age = now - t->last_update;
-            lv_opa_t opa = age < 30000 ? LV_OPA_COVER : (lv_opa_t)(LV_OPA_COVER - (LV_OPA_COVER - LV_OPA_30) * (age - 30000) / 150000);
-            if (offscale) opa = opa / 3;
+            uint8_t opa = age < 30000 ? 255
+                        : (uint8_t)(255 - (255 - 76) * (age - 30000) / 150000);
+            if (offscale) opa /= 3;
 
-            lv_draw_rect_dsc_t rdsc;
-            lv_draw_rect_dsc_init(&rdsc);
-            rdsc.bg_color = t->class_b ? col_blip_b() : col_blip();
-            rdsc.bg_opa = opa;
-            rdsc.radius = LV_RADIUS_CIRCLE;
-            rdsc.border_width = 0;
+            // CPA/TCPA: highlight targets that will pass close to the house soon
+            float cpa_nm, tcpa_h;
+            geo_cpa(HOME_LAT, HOME_LON, t->lat, t->lon, t->cog / 10.0f, t->sog / 10.0f, cpa_nm, tcpa_h);
+            bool alert = (tcpa_h > 0.0f && tcpa_h < 0.25f && cpa_nm < 0.5f);
+
+            const uint8_t *base = alert ? c_alert : (t->class_b ? c_blip_b : c_blip);
+            uint8_t rgba[4] = { base[0], base[1], base[2], opa };
             int bs = SCALE_PX(7);
-            lv_canvas_draw_rect(fg_canvas, (int32_t)cx - bs / 2, (int32_t)cy - bs / 2, bs, bs, &rdsc);
+            fg_rect((int32_t)cx - bs / 2, (int32_t)cy - bs / 2, bs, bs, rgba);
 
             // COG vector
             if (t->cog < 3600) {
                 float crad = (t->cog / 10.0f - RADAR_UP_BEARING) * (float)M_PI / 180.0f;
-                lv_draw_line_dsc_t ldsc;
-                lv_draw_line_dsc_init(&ldsc);
-                ldsc.color = t->class_b ? col_blip_b() : col_blip();
-                ldsc.width = SCALE_PX(2);
-                ldsc.opa = opa;
-                ldsc.rounded = true;
-                lv_point_precise_t vpts[2];
-                vpts[0].x = cx; vpts[0].y = cy;
-                vpts[1].x = cx + SCALE_PX(12) * sinf(crad);
-                vpts[1].y = cy - SCALE_PX(12) * cosf(crad);
-                lv_canvas_draw_line(fg_canvas, vpts, 2, &ldsc);
+                fg_line(cx, cy, cx + SCALE_PX(12) * sinf(crad), cy - SCALE_PX(12) * cosf(crad),
+                        rgba, SCALE_PX(2));
             }
 
             // selection box
             if (i == selected) {
-                lv_draw_rect_dsc_t sdsc;
-                lv_draw_rect_dsc_init(&sdsc);
-                sdsc.bg_opa = LV_OPA_TRANSP;
-                sdsc.border_color = lv_color_hex(0xff5050);
-                sdsc.border_opa = LV_OPA_COVER;
-                sdsc.border_width = SCALE_PX(2);
-                sdsc.radius = SCALE_PX(2);
+                uint8_t red[4] = { 0xff, 0x50, 0x50, 255 };
                 int ss = SCALE_PX(15);
-                lv_canvas_draw_rect(fg_canvas, (int32_t)cx - ss / 2, (int32_t)cy - ss / 2, ss, ss, &sdsc);
+                int32_t sx = (int32_t)cx - ss / 2, sy = (int32_t)cy - ss / 2;
+                fg_rect(sx, sy, ss, SCALE_PX(2), red);
+                fg_rect(sx, sy + ss - SCALE_PX(2), ss, SCALE_PX(2), red);
+                fg_rect(sx, sy, SCALE_PX(2), ss, red);
+                fg_rect(sx + ss - SCALE_PX(2), sy, SCALE_PX(2), ss, red);
             }
         }
+
+        lv_obj_invalidate(fg_canvas);
     }
 
     void update_info() {
@@ -437,10 +481,17 @@ private:
         }
         float dist = geo_distance_nm(HOME_LAT, HOME_LON, t->lat, t->lon);
         float brg = geo_bearing_deg(HOME_LAT, HOME_LON, t->lat, t->lon);
+        float cpa_nm, tcpa_h;
+        geo_cpa(HOME_LAT, HOME_LON, t->lat, t->lon, t->cog / 10.0f, t->sog / 10.0f, cpa_nm, tcpa_h);
         char buf[96];
         const char *name = t->name[0] ? t->name : "-----";
-        lv_snprintf(buf, sizeof(buf), "%s %lu\n%.1fkn %03ddeg %.1fnm @%03d",
-                    name, t->mmsi, t->sog / 10.0f, (int)(t->cog / 10.0f), dist, (int)brg);
+        if (tcpa_h > 0.0f)
+            lv_snprintf(buf, sizeof(buf), "%s %lu\n%.1fkn %03ddeg %.1fnm @%03d\nCPA %.1fnm in %dmin",
+                        name, (unsigned long)t->mmsi, t->sog / 10.0f, (int)(t->cog / 10.0f), dist, (int)brg,
+                        cpa_nm, (int)(tcpa_h * 60.0f));
+        else
+            lv_snprintf(buf, sizeof(buf), "%s %lu\n%.1fkn %03ddeg %.1fnm @%03d",
+                        name, (unsigned long)t->mmsi, t->sog / 10.0f, (int)(t->cog / 10.0f), dist, (int)brg);
         lv_label_set_text(info_label, buf);
     }
 
@@ -454,10 +505,9 @@ private:
 
         if (now - last_status_ms > 500) {
             last_status_ms = now;
+            uint8_t count = get_ais_manager()->get_active_count();
             char buf[48];
-            lv_snprintf(buf, sizeof(buf), "AIS %d tg%s  %s",
-                        get_ais_manager()->get_active_count(),
-                        get_ais_manager()->get_active_count() == 1 ? "" : "ts",
+            lv_snprintf(buf, sizeof(buf), "AIS %d tg%s  %s", count, count == 1 ? "" : "ts",
 #ifdef SHOWCASE
                         "DEMO"
 #else

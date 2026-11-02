@@ -22,7 +22,12 @@
 
 #ifdef ARDUINO
     #include <Arduino.h>
-    #define AIS_LOG(...) Serial.printf(__VA_ARGS__)
+    // Gate logs behind DEBUG: with dozens of targets the parser is chatty
+    #if defined(DEBUG) && DEBUG
+        #define AIS_LOG(...) Serial.printf(__VA_ARGS__)
+    #else
+        #define AIS_LOG(...) do {} while (0)
+    #endif
 #else
     #include <stdio.h>
     unsigned long millis();  // provided by the host test harness

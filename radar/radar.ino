@@ -99,8 +99,10 @@ void showcase_update() {
     float t = millis() / 1000.0f;
     for (int i = 0; i < NUM_DEMO_ROUTES; i++) {
         const demo_route &r = DEMO_ROUTES[i];
-        // ping-pong along the route
-        float d = fmodf(t * r.speed_kn / 3600.0f * 60.0f, 2.0f * r.length_nm);  // nm traveled
+        // ping-pong along the route; demo time runs 60x faster than real time
+        // so boats visibly move (1 real minute = 1 demo hour)
+        float demo_t = t * 60.0f;
+        float d = fmodf(demo_t * r.speed_kn / 3600.0f, 2.0f * r.length_nm);  // nm traveled
         float leg = d > r.length_nm ? 2.0f * r.length_nm - d : d;
         float cog = d > r.length_nm ? fmodf(r.bearing + 180.0f, 360.0f) : r.bearing;
         int32_t lat, lon;
@@ -150,6 +152,11 @@ void setup() {
 
     radar = new RadarGauge(scr);
     lv_disp_load_scr(scr);
+
+    // Force a full-screen refresh (RGB panels can show garbage in corners
+    // otherwise) - same as saildrop
+    lv_obj_invalidate(lv_scr_act());
+    lv_refr_now(NULL);
 
 #ifdef SHOWCASE
     Serial.println("SHOWCASE mode: synthetic AIS targets");

@@ -97,6 +97,13 @@ inline void conn_loop() {
             conn_ais_char((char)packet[i], ais_buf, ais_idx);
     }
 
+    // Watchdog: connection alive but feed silent for 60 s -> force reconnect
+    if (millis() - conn_last_rx() > 60000) {
+        Serial.println("AIS: feed silent, reconnecting");
+        conn_tcp().stop();
+        conn_next_try() = 0;
+    }
+
     // --- Periodic stale-target cleanup ---
     if (millis() - conn_last_cleanup() > 60000) {
         conn_last_cleanup() = millis();

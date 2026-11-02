@@ -126,17 +126,48 @@ make monitor                         # serial log (115200)
 ## Tests
 
 ```bash
-make test    # g++ host test: AIS decode round-trip (types 1/18/5 multi-part),
-             # bbox rejection, geo bearing/distance/destination/projection
+make test                              # g++ host unit test: AIS decode round-trip
+                                       # (types 1/18/5 multi-part), bbox rejection,
+                                       # geo bearing/distance/destination/projection/CPA
+bash host_test/build_render_test.sh    # builds host_test/render_test: compiles the
+                                       # real LVGL 9.3 + radargauge.h on the host
+./host_test/render_test                # renders 1 s of frames into a framebuffer and
+                                       # asserts sea/coast/rings/sweep/blip pixels;
+                                       # writes host_test/render.ppm
 ```
 
 The parser was additionally validated against the real recording in
 `testdata/ais_29_01_2026.nmea` (46 targets decoded in the gulf bbox, names ok).
 
+## Gotchas found while bringing this up (both fixed)
+
+- **Never call the LVGL 9.3 canvas layer API (`lv_canvas_init_layer` + `lv_draw_*`
+  + `lv_canvas_finish_layer`) with many primitives outside a running dispatch
+  context** — it deadlocks in `lv_draw_dispatch` and hangs `setup()` (black
+  screen). `radargauge.h` therefore rasterizes directly into the canvas buffers.
+- **Canvas objects are not sized from their buffer in 9.3** — always
+  `lv_obj_set_size(canvas, w, h)` after `lv_canvas_set_buffer`.
+- **`LV_DRAW_SW_SUPPORT_ARGB8888` must be 1** for a transparent overlay canvas
+  to composite over the RGB565 display — enabled in both `lv_conf_lcd*.h`.
+
 ## Notes / limitations
 
-- The coastline is a **hand-simplified silhouette**, not a chart — refine the
-  point arrays in `radar/coastline.h` as you like.
+- The coastline is generated from real data: GSHHG high-resolution land
+  polygons for the mainland (Douglas-Peucker ~13 m) + Natural Earth 10m for
+  the islands (GSHHG "h" lacks Sant'Antioco). Regenerate with
+  `python3 tools/gen_coastline_gshhg.py [gshhg.zip] [ne_10m_coastline.geojson] [radar/coastline.h]`;
+  hand-edit `radar/coastline.h` freely — it's only a silhouette. 3 rings,
+  228 points, ~6.5 KB.
 - Off-scale boats are clamped to the screen edge and dimmed.
-- First on-device compile of this branch has not been run in CI — if LVGL 9.3
-  API details complain, they're isolated in `radargauge.h`.
+- **CPA/TCPA**: blips that will pass within 0.5 NM of the house in the next
+  15 min are drawn red; the tap-info line shows `CPA x.xnm in Nmin`.
+- The feed client reconnects on failure and force-reconnects if the feed is
+  silent for 60 s; AIS parse logs are gated behind `DEBUG`.
+- Canvas drawing uses the LVGL 9.3 layer API (`lv_canvas_init_layer` +
+  `lv_draw_*`), isolated in `radargauge.h`.
+- Known minor: the AIS target table is written on core 0 and read on core 1
+  without a lock — a blip can tear for a single frame under heavy traffic.
+  Harmless visually; a seqlock can be added if it bothers you.
+- The fg canvas is fully cleared and redrawn every 100 ms; on the 4" board
+  that's ~0.9 MB of PSRAM traffic per frame — if the sweep looks jittery under
+  load, raise `RADAR_FG_PERIOD_MS`.

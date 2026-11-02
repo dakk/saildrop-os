@@ -84,4 +84,26 @@ inline void geo_unproject(float x, float y, const geo_projection &p, float &bear
     bearing_deg = fmodf(rel + p.up_bearing_deg + 360.0f, 360.0f);
 }
 
+// Closest point of approach of a moving target to a fixed point (the house).
+// cog_deg: true course, sog_kn: speed over ground in knots.
+// Outputs: cpa_nm (>= 0), tcpa_h (hours until CPA; <= 0 = receding / already at CPA).
+inline void geo_cpa(int32_t home_lat, int32_t home_lon, int32_t tgt_lat, int32_t tgt_lon,
+                    float cog_deg, float sog_kn, float &cpa_nm, float &tcpa_h) {
+    float d = geo_distance_nm(home_lat, home_lon, tgt_lat, tgt_lon);
+    if (sog_kn < 0.3f) {  // moored/drifting: CPA is current distance, no approach
+        cpa_nm = d;
+        tcpa_h = -1.0f;
+        return;
+    }
+    float brg = geo_bearing_deg(home_lat, home_lon, tgt_lat, tgt_lon) * GEO_DEG_TO_RAD;
+    float pe = d * sinf(brg);  // target position rel. home, nm east
+    float pn = d * cosf(brg);  // nm north
+    float cr = cog_deg * GEO_DEG_TO_RAD;
+    float ve = sog_kn * sinf(cr);  // velocity, nm/h
+    float vn = sog_kn * cosf(cr);
+    float v2 = ve * ve + vn * vn;
+    cpa_nm = fabsf(pe * vn - pn * ve) / sqrtf(v2);
+    tcpa_h = -(pe * ve + pn * vn) / v2;
+}
+
 #endif // GEO_H

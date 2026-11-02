@@ -4,3 +4,7 @@ SQEX
 *.pyc
 /radar/common/
 /saildrop/common/
+host_test/build/
+host_test/render_test
+host_test/host_test
+host_test/render.ppm

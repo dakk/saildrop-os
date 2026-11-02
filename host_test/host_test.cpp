@@ -189,6 +189,18 @@ int main() {
     geo_unproject(x, y, p, ub, ud);
     CHECK(fabsf(ub - b) < 1.0f && fabsf(ud - d) < 0.2f, "unproject roundtrip (b=%.1f d=%.2f)", ub, ud);
 
+    // CPA: target 10 nm dead ahead (bearing 195) moving straight at the house
+    // at 10 kn -> CPA ~0 nm in ~1 h; a target moving away -> tcpa <= 0
+    int32_t ahead_lat, ahead_lon;
+    geo_destination(HOME_LAT, HOME_LON, 195.0f, 10.0f, ahead_lat, ahead_lon);
+    float cpa, tcpa;
+    geo_cpa(HOME_LAT, HOME_LON, ahead_lat, ahead_lon, 15.0f, 10.0f, cpa, tcpa);
+    CHECK(cpa < 0.1f && fabsf(tcpa - 1.0f) < 0.05f, "CPA head-on: cpa=%.2f tcpa=%.2fh", cpa, tcpa);
+    geo_cpa(HOME_LAT, HOME_LON, ahead_lat, ahead_lon, 195.0f, 10.0f, cpa, tcpa);
+    CHECK(tcpa <= 0.0f, "CPA receding: tcpa=%.2f (expect <= 0)", tcpa);
+    geo_cpa(HOME_LAT, HOME_LON, ahead_lat, ahead_lon, 15.0f, 0.0f, cpa, tcpa);
+    CHECK(tcpa < 0.0f && fabsf(cpa - 10.0f) < 0.1f, "CPA moored: cpa=%.2f (expect ~10)", cpa);
+
     printf("\n%s (%d failures)\n", failures ? "FAILED" : "ALL PASSED", failures);
     return failures ? 1 : 0;
 }
