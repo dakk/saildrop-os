@@ -382,20 +382,25 @@ private:
                          : (uint8_t)(255 - (255 - 76) * (age - 30000) / 150000);
             if (offscale) fade /= 3;
 
-            // CPA/TCPA: highlight targets passing close to the house soon
+            // closest approach to the house: highlight vessels that will pass
+            // within 0.5 NM of the house in the next 15 min (fixed origin, so no
+            // collision semantics - just "how close will it pass by")
             float cpa_nm, tcpa_h;
             geo_cpa(HOME_LAT, HOME_LON, t->lat, t->lon, t->cog / 10.0f, t->sog / 10.0f, cpa_nm, tcpa_h);
             bool alert = (tcpa_h > 0.0f && tcpa_h < 0.25f && cpa_nm < 0.5f);
 
+            // blip color = vessel type color (oceanook palette); red if it will
+            // pass close to the house soon
             uint16_t base = alert ? lv_color_to_u16(lv_color_hex(0xff5050))
-                        : t->class_b ? lv_color_to_u16(lv_color_hex(0x6ac8ff))
-                                     : lv_color_to_u16(lv_color_hex(0xffb347));
+                                  : lv_color_to_u16(lv_color_hex(ais_ship_type_color(t->ship_type)));
             uint16_t col = lerp565(c_sea, base, fade);
 
             int bs = SCALE_PX(7);
             rect((int32_t)cx - bs / 2, (int32_t)cy - bs / 2, bs, bs, col);
 
-            if (t->cog < 3600) {
+            // not moving (at anchor / moored / sog < 0.4kn): no course vector
+            bool moving = (t->nav_status != 1 && t->nav_status != 5 && t->sog >= 4);
+            if (moving && t->cog < 3600) {
                 float crad = (t->cog / 10.0f - RADAR_UP_BEARING) * (float)M_PI / 180.0f;
                 line(cx, cy, cx + SCALE_PX(12) * sinf(crad), cy - SCALE_PX(12) * cosf(crad),
                      col, SCALE_PX(2));
@@ -452,23 +457,26 @@ private:
         float brg = geo_bearing_deg(HOME_LAT, HOME_LON, t->lat, t->lon);
         float cpa_nm, tcpa_h;
         geo_cpa(HOME_LAT, HOME_LON, t->lat, t->lon, t->cog / 10.0f, t->sog / 10.0f, cpa_nm, tcpa_h);
-        char buf[96];
+        char buf[160];
         const char *name = t->name[0] ? t->name : "-----";
         // NOTE: lv_snprintf has no float support unless LV_USE_FLOAT is on,
         // so format tenths as integers: "%d.%d" (AIS already stores 0.1 units)
         int sog10 = t->sog;
         int dist10 = (int)(dist * 10.0f + 0.5f);
-        if (tcpa_h > 0.0f) {
-            int cpa10 = (int)(cpa_nm * 10.0f + 0.5f);
-            int tcpa_min = (int)(tcpa_h * 60.0f + 0.5f);
-            lv_snprintf(buf, sizeof(buf), "%s %lu\n%d.%dkn %03ddeg %d.%dnm @%03d\nCPA %d.%dnm in %dmin",
-                        name, (unsigned long)t->mmsi, sog10 / 10, sog10 % 10, (int)(t->cog / 10.0f),
+        int cpa10 = (int)(cpa_nm * 10.0f + 0.5f);
+        int tcpa_min = (int)(tcpa_h * 60.0f + 0.5f);
+        if (tcpa_h > 0.0f)
+            lv_snprintf(buf, sizeof(buf), "%s %lu\n%s - %s\n%d.%dkn %03ddeg %d.%dnm @%03d\nclosest %d.%dnm in %dmin",
+                        name, (unsigned long)t->mmsi, ais_ship_type_name(t->ship_type),
+                        ais_nav_status_name(t->nav_status),
+                        sog10 / 10, sog10 % 10, (int)(t->cog / 10.0f),
                         dist10 / 10, dist10 % 10, (int)brg, cpa10 / 10, cpa10 % 10, tcpa_min);
-        } else {
-            lv_snprintf(buf, sizeof(buf), "%s %lu\n%d.%dkn %03ddeg %d.%dnm @%03d",
-                        name, (unsigned long)t->mmsi, sog10 / 10, sog10 % 10, (int)(t->cog / 10.0f),
+        else
+            lv_snprintf(buf, sizeof(buf), "%s %lu\n%s - %s\n%d.%dkn %03ddeg %d.%dnm @%03d",
+                        name, (unsigned long)t->mmsi, ais_ship_type_name(t->ship_type),
+                        ais_nav_status_name(t->nav_status),
+                        sog10 / 10, sog10 % 10, (int)(t->cog / 10.0f),
                         dist10 / 10, dist10 % 10, (int)brg);
-        }
         set_label_text(info_label, buf);
     }
 
@@ -484,13 +492,12 @@ private:
             last_status_ms = now;
             uint8_t count = get_ais_manager()->get_active_count();
             char buf[48];
-            lv_snprintf(buf, sizeof(buf), "AIS %d tg%s  %s", count, count == 1 ? "" : "ts",
 #ifdef SHOWCASE
-                        "DEMO"
+            lv_snprintf(buf, sizeof(buf), "AIS %d ships - DEMO", count);
 #else
-                        conn_feed_connected() ? "FEED OK" : "no feed"
+            lv_snprintf(buf, sizeof(buf), "AIS %d ships - %lu msg/m", count,
+                        (unsigned long)conn_msgs_per_min());
 #endif
-                        );
             set_label_text(status_label, buf);
             lv_obj_set_style_text_color(status_label,
 #ifdef SHOWCASE

@@ -57,15 +57,88 @@ struct ais_target {
     uint16_t heading;       // degrees, 511 = unavailable
     uint8_t nav_status;     // 0-15 (Class A)
     uint8_t class_b;        // 1 for Class B (types 18/19)
+    uint8_t ship_type;      // AIS ship type code 0-99, 255 = unknown (from type 5 / 24B)
     char name[21];          // from type 5 / 24, may be empty
     uint32_t last_update;   // millis()
     bool valid;
 };
 
+// ---- display helpers: names + colors ----
+// Ship type names follow the categories used by oceanook.com (vesselTypes);
+// nav status names follow AisParser's AisMessage.js NAV_STATUS.
+
+inline const char* ais_ship_type_name(uint8_t t) {
+    if (t == 255) return "Unknown";
+    if (t < 20) return "Not available";
+    if (t < 30) return "Wing in ground";
+    switch (t) {
+        case 30: return "Fishing";
+        case 31: case 32: return "Towing";
+        case 33: return "Dredging";
+        case 34: return "Diving ops";
+        case 35: return "Military ops";
+        case 36: return "Sailing";
+        case 37: return "Pleasure Craft";
+        default: break;
+    }
+    if (t < 40) return "Reserved";
+    if (t < 50) return "High speed craft";
+    if (t < 60) {
+        switch (t) {
+            case 50: return "Pilot Vessel";
+            case 51: return "Search and Rescue";
+            case 52: return "Tug";
+            case 53: return "Port Tender";
+            case 54: return "Anti-pollution";
+            case 55: return "Law Enforcement";
+            case 58: return "Medical Transport";
+            default: return "Special Craft";
+        }
+    }
+    if (t < 70) return "Passenger";
+    if (t < 80) return "Cargo";
+    if (t < 90) return "Tanker";
+    return "Other Type";
+}
+
+// vessel type colors from https://oceanook.com/js/index.js (vesselTypes)
+inline uint32_t ais_ship_type_color(uint8_t t) {
+    if (t == 255 || t < 20) return 0xdddddd;   // unknown / not available
+    if (t < 30) return 0xcecb12;               // WIG -> HSC yellow
+    if (t == 30) return 0xbc7101;              // Fishing
+    if (t <= 32) return 0xaa194e;              // Towing
+    if (t == 33) return 0xdddddd;              // Dredging
+    if (t == 35) return 0x6d4c4c;              // Military ops
+    if (t == 36 || t == 37) return 0xa50d99;   // Sailing / Pleasure Craft
+    if (t < 40) return 0xdddddd;               // reserved
+    if (t < 50) return 0xcecb12;               // HSC
+    if (t == 50) return 0xaa194e;              // Pilot Vessel
+    if (t == 51) return 0xff0010;              // Search and Rescue
+    if (t == 52 || t == 53) return 0x28c9c6;   // Tug / Port Tender
+    if (t == 54) return 0x025117;              // Anti-pollution
+    if (t < 60) return 0xdddddd;               // other special craft
+    if (t < 70) return 0x2753ba;               // Passenger
+    if (t < 80) return 0x0aa831;               // Cargo
+    if (t < 90) return 0xb51010;               // Tanker
+    return 0xdddddd;                           // Other Type
+}
+
+inline const char* ais_nav_status_name(uint8_t s) {
+    static const char* names[16] = {
+        "Under way using engine", "At anchor", "Not under command",
+        "Restricted manoeuverability", "Constrained by her draught", "Moored",
+        "Aground", "Engaged in Fishing", "Under way sailing",
+        "Reserved (HSC)", "Reserved (WIG)", "Reserved", "Reserved", "Reserved",
+        "Reserved", "Not defined (default)"
+    };
+    return names[s & 15];
+}
+
 class AISManager {
 public:
     AISManager() {
         memset(targets, 0, sizeof(targets));
+        for (int i = 0; i < AIS_MAX_TARGETS; i++) targets[i].ship_type = 255;  // unknown
         memset(fragment_buffer, 0, sizeof(fragment_buffer));
         expected_fragments = 0;
         received_fragments = 0;
@@ -184,7 +257,8 @@ public:
 
     // Demo mode (SHOWCASE): inject/move a synthetic target
     void debug_inject(uint32_t mmsi, int32_t lat, int32_t lon, uint16_t cog,
-                      uint16_t sog, uint16_t heading, const char* name) {
+                      uint16_t sog, uint16_t heading, const char* name,
+                      uint8_t ship_type = 255, uint8_t nav_status = 15) {
         int slot = find_or_create_slot(mmsi);
         if (slot < 0) return;
         ais_target &t = targets[slot];
@@ -194,6 +268,8 @@ public:
         t.cog = cog;
         t.sog = sog;
         t.heading = heading;
+        t.ship_type = ship_type;
+        t.nav_status = nav_status;
         t.last_update = millis();
         t.valid = true;
         if (name) strncpy(t.name, name, sizeof(t.name) - 1);
@@ -318,24 +394,32 @@ private:
                 t.name[0] ? " name=" : "", t.name);
     }
 
-    // Type 5: static voyage data, vessel name at bit 112, 120 bits (20 chars)
+    // Type 5: static voyage data, vessel name at bit 112 (120 bits),
+    // ship type at bit 232 (8 bits)
     void parse_static_name(const uint8_t* payload, int payload_bits) {
         if (payload_bits < 232) return;
         uint32_t mmsi = extract_bits(payload, 8, 30);
         int slot = find_slot(mmsi);
         if (slot < 0) return;  // no position yet: skip (position report will come)
         extract_text(payload, 112, 120, targets[slot].name, sizeof(targets[slot].name));
+        if (payload_bits >= 240)
+            targets[slot].ship_type = (uint8_t)extract_bits(payload, 232, 8);
     }
 
     // Type 24: Class B static; part A (partno 0) carries the name at bit 40
+    // (120 bits), part B (partno 1) carries the ship type at bit 40 (8 bits)
     void parse_static_name_24(const uint8_t* payload, int payload_bits) {
-        if (payload_bits < 160) return;
+        if (payload_bits < 48) return;
         uint32_t mmsi = extract_bits(payload, 8, 30);
         uint8_t partno = (uint8_t)extract_bits(payload, 38, 2);
-        if (partno != 0) return;
         int slot = find_slot(mmsi);
         if (slot < 0) return;
-        extract_text(payload, 40, 120, targets[slot].name, sizeof(targets[slot].name));
+        if (partno == 0) {
+            if (payload_bits >= 160)
+                extract_text(payload, 40, 120, targets[slot].name, sizeof(targets[slot].name));
+        } else if (partno == 1) {
+            targets[slot].ship_type = (uint8_t)extract_bits(payload, 40, 8);
+        }
     }
 };
 

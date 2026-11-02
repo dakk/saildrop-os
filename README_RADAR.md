@@ -103,8 +103,9 @@ make monitor                         # serial log (115200)
 ## Controls
 
 - **swipe any direction**: radar range — 5 / 10 / 20 NM (default 20)
-- **tap a blip**: select nearest target → name, MMSI, SOG, COG, distance and
-  bearing from home (bottom-left); tap empty water to deselect
+- **tap a blip**: select nearest target → name, MMSI, **vessel type and nav
+  status** (e.g. "Cargo · Moored"), SOG, COG, distance and bearing from home,
+  closest approach (bottom-left); tap empty water to deselect
 - top line: active target count + feed state (`FEED OK` / `no feed` / `DEMO`)
 - top-right: compass showing where true north is on the rotated display
 
@@ -116,9 +117,12 @@ make monitor                         # serial log (115200)
   - *bg* (RGB565, redrawn only on range change): sea, coastline polygons
     (scanline fill), range rings centered on the house, 30° spokes, house dot,
     north compass
-  - *fg* (ARGB8888 transparent, every 100 ms): AIS blips only (dot + COG
-    vector; amber = Class A, blue = Class B, red = CPA alert; dim when stale
-    or off-scale), selection box. Range rings are dark red; no sweep/spokes.
+  - single full-screen RGB565 canvas; blips drawn directly on it (restored
+    from a pristine static copy on change, area-only invalidation). Blip color
+    = vessel type (oceanook.com palette: cargo green, tanker red, passenger
+    blue, fishing orange, sailing/pleasure purple, SAR bright red, ...);
+    red override = close-pass-to-home alert; dim when stale or off-scale.
+    Range rings are dark red; no sweep/spokes.
 - Projection (`common/geo.h`): bearing/distance from home → rotated by
   `RADAR_UP_BEARING` → screen px; scale = vertical space above the house ÷
   range, so the top of the screen is always `range` NM toward screen-up.
@@ -128,7 +132,7 @@ make monitor                         # serial log (115200)
 ```bash
 make test                              # g++ host unit test: AIS decode round-trip
                                        # (types 1/18/5 multi-part), bbox rejection,
-                                       # geo bearing/distance/destination/projection/CPA
+                                       # geo bearing/distance/destination/projection/closest-approach
 bash host_test/build_render_test.sh    # builds host_test/render_test: compiles the
                                        # real LVGL 9.3 + radargauge.h on the host
 ./host_test/render_test                # renders 1 s of frames into a framebuffer and
@@ -168,8 +172,9 @@ The parser was additionally validated against the real recording in
   hand-edit `radar/coastline.h` freely — it's only a silhouette. 3 rings,
   228 points, ~6.5 KB.
 - Off-scale boats are clamped to the screen edge and dimmed.
-- **CPA/TCPA**: blips that will pass within 0.5 NM of the house in the next
-  15 min are drawn red; the tap-info line shows `CPA x.xnm in Nmin`.
+- **Closest approach to the house** (not collision - the origin is fixed):
+  blips that will pass within 0.5 NM of the house in the next 15 min are drawn
+  red; the tap-info line shows `closest x.xnm in Nmin`.
 - The feed client reconnects on failure and force-reconnects if the feed is
   silent for 60 s; AIS parse logs are gated behind `DEBUG`.
 - Canvas drawing uses the LVGL 9.3 layer API (`lv_canvas_init_layer` +

@@ -32,6 +32,30 @@ inline bool conn_feed_connected() {
 
 inline uint32_t conn_feed_last_rx() { return conn_last_rx(); }
 
+// AIS message rate: one ring slot per second, last 60 s
+inline uint32_t& conn_msg_sec_count() { static uint32_t c = 0; return c; }  // msgs in current second
+inline uint32_t* conn_msg_ring() { static uint32_t r[60] = {0}; return r; }
+inline uint8_t& conn_msg_ring_pos() { static uint8_t p = 0; return p; }
+inline uint32_t& conn_msg_last_sec() { static uint32_t t = 0; return t; }
+
+inline uint32_t conn_msgs_per_min() {
+    uint32_t sum = 0;
+    uint32_t* r = conn_msg_ring();
+    for (int i = 0; i < 60; i++) sum += r[i];
+    return sum;
+}
+
+// call from conn_loop (runs every ~100 ms): bucket per-second message counts
+inline void conn_msg_tick() {
+    uint32_t now = millis();
+    if (now - conn_msg_last_sec() >= 1000) {
+        conn_msg_last_sec() = now;
+        conn_msg_ring()[conn_msg_ring_pos()] = conn_msg_sec_count();
+        conn_msg_ring_pos() = (conn_msg_ring_pos() + 1) % 60;
+        conn_msg_sec_count() = 0;
+    }
+}
+
 inline void conn_setup() {
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -45,8 +69,10 @@ inline void conn_ais_char(char c, char* buf, uint8_t &idx) {
         buf[idx++] = c;
         if (c == '\n' || c == '\r') {
             buf[idx] = '\0';
-            if (strncmp(buf, "!AIVDM", 6) == 0 || strncmp(buf, "!AIVDO", 6) == 0)
+            if (strncmp(buf, "!AIVDM", 6) == 0 || strncmp(buf, "!AIVDO", 6) == 0) {
                 get_ais_manager()->process_sentence(buf);
+                conn_msg_sec_count()++;
+            }
             idx = 0;
         }
     } else {
@@ -109,6 +135,8 @@ inline void conn_loop() {
         conn_last_cleanup() = millis();
         get_ais_manager()->cleanup_stale();
     }
+
+    conn_msg_tick();
 }
 
 #endif // CONN_H

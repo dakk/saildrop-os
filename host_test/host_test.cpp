@@ -167,6 +167,31 @@ int main() {
         if (x->valid && x->mmsi == 123456789) t = x;
     }
     CHECK(t && strcmp(t->name, "TEST SHIP") == 0, "type5 name decoded: '%s'", t ? t->name : "(none)");
+    CHECK(t && t->ship_type == 70, "type5 ship type parsed (70=Cargo), got %d", t ? t->ship_type : -1);
+    CHECK(strcmp(ais_ship_type_name(70), "Cargo") == 0, "ship type name 70 -> Cargo");
+    CHECK(ais_ship_type_color(70) == 0x0aa831, "ship type color 70 -> oceanook cargo green");
+    CHECK(ais_ship_type_color(80) == 0xb51010 && strcmp(ais_ship_type_name(80), "Tanker") == 0, "80 -> Tanker red");
+    CHECK(strcmp(ais_nav_status_name(5), "Moored") == 0, "nav status 5 -> Moored");
+    CHECK(strcmp(ais_nav_status_name(0), "Under way using engine") == 0, "nav status 0");
+
+    // --- Type 24 part B: ship type at bit 40 (Class B static) ---
+    {
+        BitWriter w;
+        w.put(24, 6); w.put(0, 2); w.put(999000111, 30); w.put(1, 2);  // partno=1
+        w.put(36, 8);  // ship type 36 = Sailing
+        while (w.bits < 168) w.put(0, 1);
+        ais->process_sentence(sentence1(w.armor()).c_str());
+        bool ok24 = false;
+        for (int i = 0; i < AIS_MAX_TARGETS; i++) {
+            const ais_target* x = ais->get_target(i);
+            if (x->valid && x->mmsi == 999000111) {
+                ok24 = (x->ship_type == 36);
+                CHECK(ok24, "type24B ship type 36 (Sailing), got %d", x->ship_type);
+                CHECK(strcmp(ais_ship_type_name(x->ship_type), "Sailing") == 0, "name Sailing");
+            }
+        }
+        CHECK(ok24, "type24B target found");
+    }
 
     // --- geo math ---
     const int32_t HOME_LAT = 39215977, HOME_LON = 9267019;

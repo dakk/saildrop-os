@@ -64,8 +64,8 @@ int main() {
     lv_obj_invalidate(lv_scr_act());
     lv_refr_now(NULL);
 
-    // inject one fake target mid-gulf so blips render too
-    get_ais_manager()->debug_inject(247000001, 39050000, 9200000, 1350, 120, 511, "TESTBOAT");
+    // inject one fake cargo target mid-gulf so blips render too
+    get_ais_manager()->debug_inject(247000001, 39050000, 9200000, 1350, 120, 511, "TESTBOAT", 70, 5);
 
     // run ~1 s of LVGL time
     for (int i = 0; i < 500; i++) {
@@ -74,25 +74,25 @@ int main() {
         lv_timer_handler();
     }
 
-    // exercise range switching (what a swipe triggers) and verify it repaints
-    uint32_t ring_before = count_color(lv_color_to_u16(lv_color_hex(0x8b1a1a)));
-    radar.cycle_range();  // 20 -> 40 NM
-    for (int i = 0; i < 50; i++) { g_millis += 2; lv_tick_inc(2); lv_timer_handler(); }
-    uint32_t ring_after = count_color(lv_color_to_u16(lv_color_hex(0x8b1a1a)));
-    printf("ring px before/after 4x cycle_range: %u -> %u\n", ring_before, ring_after);
-
     // expected colors (RGB565)
     uint16_t sea   = lv_color_to_u16(lv_color_hex(0x0b1d26));
     uint16_t land  = lv_color_to_u16(lv_color_hex(0x33301f));
     uint16_t ring  = lv_color_to_u16(lv_color_hex(0x8b1a1a));  // dark red
     uint16_t sweep = lv_color_to_u16(lv_color_hex(0x39ff6a));
-    uint16_t blip  = lv_color_to_u16(lv_color_hex(0xffb347));
+    uint16_t blip  = lv_color_to_u16(lv_color_hex(0x0aa831));  // oceanook Cargo green
     uint16_t house = lv_color_to_u16(lv_color_hex(0xffb347));
 
     uint32_t n_sea = count_color(sea), n_land = count_color(land);
     uint32_t n_ring = count_color(ring), n_sweep = count_color(sweep);
     uint32_t n_blip = count_color(blip);
     uint32_t n_black = count_color(0x0000);
+
+    // exercise range switching (what a swipe triggers) and verify it repaints
+    uint32_t ring_before = count_color(lv_color_to_u16(lv_color_hex(0x8b1a1a)));
+    radar.cycle_range();  // 20 -> 40 NM
+    for (int i = 0; i < 50; i++) { g_millis += 2; lv_tick_inc(2); lv_timer_handler(); }
+    uint32_t ring_after = count_color(lv_color_to_u16(lv_color_hex(0x8b1a1a)));
+    printf("ring px before/after 4x cycle_range: %u -> %u\n", ring_before, ring_after);
 
     printf("pixels: sea=%u land=%u ring=%u sweep=%u blip/house=%u black=%u (total %d)\n",
            n_sea, n_land, n_ring, n_sweep, n_blip, n_black, W * H);
@@ -113,7 +113,7 @@ int main() {
     NEED(n_land > 5000, "coastline land drawn (%u px)", n_land);
     NEED(n_ring > 500, "range rings drawn (%u px)", n_ring);
     NEED(n_sweep == 0, "no sweep line (%u px, want 0)", n_sweep);
-    NEED(n_blip > 10, "blip drawn (%u px)", n_blip);
+    NEED(n_blip > 10, "blip drawn (%u px)", n_blip);  // Moored target: dot only, no course vector
     NEED(n_black < W * H / 2, "screen not mostly black (black=%u)", n_black);
     NEED(ring_after != ring_before && ring_after > 100, "cycle_range repaints rings (%u -> %u)", ring_before, ring_after);
 
@@ -133,7 +133,21 @@ int main() {
         NEED(strstr(txt, "TESTBOAT") != nullptr, "info shows name");
         NEED(strstr(txt, "12.0kn") != nullptr, "info shows speed as 12.0kn (got '%s')", txt);
         NEED(strstr(txt, "135deg") != nullptr, "info shows cog 135deg");
+        NEED(strstr(txt, "Cargo") != nullptr, "info shows ship type Cargo");
+        NEED(strstr(txt, "Moored") != nullptr, "info shows nav status Moored");
+        bool ascii_ok = true;
+        for (const char *p = txt; *p; p++) if ((unsigned char)*p >= 128) ascii_ok = false;
+        NEED(ascii_ok, "info label is pure ASCII (no tofu glyphs): '%s'", txt);
         NEED(strstr(txt, "fkn") == nullptr, "no broken float format");
+        NEED(strstr(txt, "closest ") != nullptr || strstr(txt, "\n") != nullptr, "info has detail line");
+    }
+
+    // status line format: "AIS X ships - Y msg/m"
+    {
+        const char *st = lv_label_get_text(radar.status_label);
+        printf("status label: '%s'\n", st);
+        NEED(strncmp(st, "AIS ", 4) == 0 && strstr(st, "ships - ") != nullptr && strstr(st, "msg/m") != nullptr,
+             "status line is 'AIS X ships - Y msg/m' (got '%s')", st);
     }
 
     // ring labels centered on the rings at the up axis

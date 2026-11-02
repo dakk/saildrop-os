@@ -95,13 +95,17 @@ struct demo_route {
     float bearing;         // deg
     float speed_kn;
     float length_nm;       // route length (ping-pong)
+    uint8_t ship_type;     // AIS ship type code
+    uint8_t nav_status;    // AIS nav status code
 };
 // routes roughly like real gulf traffic (see testdata/ais_29_01_2026.nmea)
 static const demo_route DEMO_ROUTES[] = {
-    { 247141000, "FERRY",    39207000, 9115000, 170.0f, 14.0f, 8.0f  },
-    { 247348700, "CARGO",    39050000, 9050000, 120.0f, 12.0f, 20.0f },
-    { 247520250, "SAILBOAT", 39214000, 9200000,  30.0f,  6.0f, 3.0f  },
-    { 247415200, "MOORED",   39210500, 9106700,   0.0f,  0.0f, 0.0f  },
+    // mmsi, name, start lat/lon (microdeg), bearing, speed kn, route length nm,
+    // ship type (AIS code), nav status
+    { 247141000, "FERRY",    39207000, 9115000, 170.0f, 14.0f, 8.0f,  60, 0 },  // Passenger, under way
+    { 247348700, "CARGO",    39050000, 9050000, 120.0f, 12.0f, 20.0f, 70, 0 },  // Cargo, under way
+    { 247520250, "SAILBOAT", 39214000, 9200000,  30.0f,  6.0f, 3.0f,  36, 8 },  // Sailing, sailing
+    { 247415200, "MOORED",   39210500, 9106700,   0.0f,  0.0f, 0.0f,   0, 5 },  // Moored
 };
 static const int NUM_DEMO_ROUTES = sizeof(DEMO_ROUTES) / sizeof(DEMO_ROUTES[0]);
 
@@ -119,7 +123,7 @@ void showcase_update() {
         geo_destination(r.lat, r.lon, r.bearing, leg, lat, lon);
         get_ais_manager()->debug_inject(r.mmsi, lat, lon,
                                         (uint16_t)(cog * 10), (uint16_t)(r.speed_kn * 10),
-                                        511, r.name);
+                                        511, r.name, r.ship_type, r.nav_status);
     }
 }
 
