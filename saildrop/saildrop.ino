@@ -18,7 +18,7 @@
 #include <Arduino.h>
 #include <esp_system.h>
 #include <lvgl.h>
-#include "hal.h"
+#include "common/hal.h"
 #include "conn.h"
 #include "settings.h"
 #include "wifiportal.h"
@@ -59,14 +59,17 @@ static bool sd_card_available = false;
 // Draw buffer - size defined by board configuration
 // For RGB displays with PSRAM, allocate in PSRAM for larger buffer
 #if USE_PSRAM_BUFFER && defined(BOARD_LCD_4)
-    // Allocate from PSRAM for 4" display (larger buffer needed)
+    // Full-screen PSRAM draw buffer on the RGB board: PARTIAL mode with a
+    // full-size buffer flushes each frame in one block (stable on the ST7701;
+    // a 1/10 buffer multi-chunk flush tears). Same fix as the radar app.
     static uint8_t* draw_buf = nullptr;
-    #define DRAW_BUF_ALLOC_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
+    #define DRAW_BUF_ALLOC_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT * (LV_COLOR_DEPTH / 8))
 #else
     // Static allocation for SPI displays
     #define DRAW_BUF_ALLOC_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
     static uint32_t draw_buf[DRAW_BUF_ALLOC_SIZE / 4];
 #endif
+static size_t draw_buf_size = DRAW_BUF_ALLOC_SIZE;  // actual allocated size (may shrink on fallback)
 
 static Screen *screens[16];
 int current_screen = 0;
@@ -337,21 +340,23 @@ void setup()
     Serial.println("HAL initialized");
 
 #if USE_PSRAM_BUFFER && defined(BOARD_LCD_4)
-    // Allocate draw buffer from PSRAM for 4" display
-    draw_buf = (uint8_t*)heap_caps_malloc(DRAW_BUF_ALLOC_SIZE, MALLOC_CAP_SPIRAM);
+    // Allocate draw buffer from PSRAM for 4" display (full-screen size, see above)
+    draw_buf_size = DRAW_BUF_ALLOC_SIZE;
+    draw_buf = (uint8_t*)heap_caps_malloc(draw_buf_size, MALLOC_CAP_SPIRAM);
     if (draw_buf == nullptr) {
-        Serial.println("ERROR: Failed to allocate draw buffer from PSRAM!");
-        // Fallback to internal RAM with smaller buffer
-        draw_buf = (uint8_t*)malloc(SCREEN_WIDTH * SCREEN_HEIGHT / 20 * (LV_COLOR_DEPTH / 8));
+        Serial.println("ERROR: Failed to allocate full-screen draw buffer from PSRAM!");
+        // Fallback: smaller buffer in internal RAM (more flushes per frame)
+        draw_buf_size = SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8);
+        draw_buf = (uint8_t*)malloc(draw_buf_size);
     }
     // IMPORTANT: Zero the buffer to prevent garbage pixels in corners
     if (draw_buf != nullptr) {
-        memset(draw_buf, 0, DRAW_BUF_ALLOC_SIZE);
+        memset(draw_buf, 0, draw_buf_size);
     }
 #endif
 
     // Initialize display using HAL
-    lv_display_t * disp = hal().initDisplay(draw_buf, DRAW_BUF_ALLOC_SIZE);
+    lv_display_t * disp = hal().initDisplay(draw_buf, draw_buf_size);
 
     /*Initialize the input device driver*/
     lv_indev_t *indev = lv_indev_create();

@@ -78,4 +78,8 @@ class CST816S {
     uint8_t i2c_write(uint8_t addr, uint8_t reg_addr, const uint8_t * reg_data, uint32_t length);
 };
 
+// Header-only: pull in the implementation (common/ is included via relative
+// paths from sketches, so its .cpp files are not compiled separately)
+#include "CTS816S.cpp"
+
 #endif

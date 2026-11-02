@@ -20,7 +20,7 @@
 #include "conf.h"
 #include "data.h"
 #include "settings.h"
-#include "ais.h"
+#include "common/ais.h"
 
 String networks[32];
 uint8_t n_networks = 0;

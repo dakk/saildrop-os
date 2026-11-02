@@ -2,6 +2,12 @@
 
 Saildrop OS is an ESP32 operating system for sailing gauges and tools.
 
+This repo also contains **`radar/`** — a standalone naval radar showing live
+AIS boats in the Gulf of Cagliari relative to a fixed home position (bottom
+center of the display, stylized coastline instead of a map). Shared toolchain
+code lives in `common/` (header-only), used by both apps. See
+[`README_RADAR.md`](README_RADAR.md). Build with `make compile APP=radar BOARD=lcd4`.
+
 This is a work in progress project, and currently I'm targeting the Waveshare Esp32 with 1.28 inch touch LCD, connected to an NMEA3WIFI multiplexer using wifi.
 
 [![Watch the Short](https://img.youtube.com/vi/UroC3OnLnkQ/0.jpg)](https://www.youtube.com/shorts/UroC3OnLnkQ)

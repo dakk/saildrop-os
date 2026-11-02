@@ -29,11 +29,19 @@
 
 // Include board-specific configuration
 // This defines SCREEN_WIDTH, SCREEN_HEIGHT, and hardware pins
-#include "boards/boards.h"
+#include "common/boards/boards.h"
 
 #define DEBUG 1
 #define LVGL_TICK_PERIOD_MS 2
 #define LOOP_DELAY 2
+
+// The shared AIS parser (common/ais.h) filters targets to a bounding box;
+// saildrop sails anywhere, so disable the filter here (radar/conf.h keeps
+// the Gulf of Cagliari box)
+#define AIS_BBOX_LAT_MIN -90000000
+#define AIS_BBOX_LAT_MAX  90000000
+#define AIS_BBOX_LON_MIN -180000000
+#define AIS_BBOX_LON_MAX  180000000
 
 // Screen dimensions are now defined in boards/board_*.h
 // The UI will scale automatically via scale.h

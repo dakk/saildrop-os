@@ -18,8 +18,8 @@
 
 #include "screen.h"
 #include "../data.h"
-#include "../scale.h"
-#include "../gauges/styles.h"
+#include "common/scale.h"
+#include "common/gauges/styles.h"
 
 class TackScreen : public Screen
 {

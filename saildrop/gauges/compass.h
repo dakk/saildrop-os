@@ -19,8 +19,8 @@
 #include <lvgl.h>
 #include "../utils.h"
 #include "../data.h"
-#include "../scale.h"
-#include "styles.h"
+#include "common/scale.h"
+#include "common/gauges/styles.h"
 
 class Compass {
 private:

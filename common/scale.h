@@ -16,7 +16,7 @@
 #ifndef SCALE_H
 #define SCALE_H
 
-#include "conf.h"
+#include "boards/boards.h"
 #include <lvgl.h>
 
 // Reference screen size (design baseline)

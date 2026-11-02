@@ -17,7 +17,7 @@
 #define STYLES_H
 
 #include <lvgl.h>
-#include "../conf.h"
+#include "../boards/boards.h"
 #include "../scale.h"
 
 namespace gauge_styles {

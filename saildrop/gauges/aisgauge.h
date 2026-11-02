@@ -19,9 +19,10 @@
 #include <lvgl.h>
 #include <cmath>
 #include "../data.h"
-#include "../ais.h"
-#include "../scale.h"
-#include "styles.h"
+#include "common/ais.h"
+#include "common/geo.h"
+#include "common/scale.h"
+#include "common/gauges/styles.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
@@ -272,8 +273,8 @@ public:
             }
 
             // Calculate bearing and distance from own boat to target
-            float bearing = calculate_bearing(data->lat, data->lon, tgt->lat, tgt->lon);
-            float distance = calculate_distance_nm(data->lat, data->lon, tgt->lat, tgt->lon);
+            float bearing = geo_bearing_deg(data->lat, data->lon, tgt->lat, tgt->lon);
+            float distance = geo_distance_nm(data->lat, data->lon, tgt->lat, tgt->lon);
 
             // Skip targets beyond range
             if (distance > range_nm * 1.2f) {

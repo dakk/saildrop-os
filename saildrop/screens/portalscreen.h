@@ -17,7 +17,7 @@
 #define PORTALSCREEN_H
 
 #include "screen.h"
-#include "../scale.h"
+#include "common/scale.h"
 #include "../conf.h"
 
 #ifndef PORTAL_SSID

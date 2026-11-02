@@ -58,4 +58,9 @@
 // Memory configuration
 #define LV_MEM_SIZE_KB  64
 
+// Battery voltage measurement (MX1.25 battery connector): GPIO1 (ADC1_CH0),
+// divided by a 200k+100k resistor network -> VBAT = ADC * 3
+#define BATTERY_ADC_PIN 1
+#define BATTERY_ADC_DIVIDER 3.0f
+
 #endif // BOARD_LCD_128_H
