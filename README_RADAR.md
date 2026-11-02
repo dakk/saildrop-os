@@ -102,7 +102,7 @@ make monitor                         # serial log (115200)
 
 ## Controls
 
-- **swipe up/down**: radar range — 5 / 10 / 20 / 40 NM (default 20)
+- **swipe any direction**: radar range — 5 / 10 / 20 NM (default 20)
 - **tap a blip**: select nearest target → name, MMSI, SOG, COG, distance and
   bearing from home (bottom-left); tap empty water to deselect
 - top line: active target count + feed state (`FEED OK` / `no feed` / `DEMO`)

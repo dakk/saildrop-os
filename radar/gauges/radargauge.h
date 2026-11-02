@@ -117,10 +117,7 @@ public:
         lv_obj_set_style_text_font(range_label, ui_scale::font_small(), 0);
         lv_obj_set_style_text_color(range_label, lv_color_hex(0x9fb8a8), 0);
 
-        north_label = lv_label_create(bg);
-        lv_obj_set_style_text_font(north_label, ui_scale::font_small(), 0);
-        lv_obj_set_style_text_color(north_label, lv_color_hex(0xd06060), 0);
-        lv_label_set_text(north_label, "N");
+        // (north arrow is drawn on the bg canvas in draw_static)
 
         set_range(2);  // default 20 NM
         draw_static();
@@ -157,7 +154,7 @@ private:
     lv_obj_t *bg;
     lv_obj_t *bg_canvas;
     lv_obj_t *fg_canvas;
-    lv_obj_t *house_label, *status_label, *info_label, *range_label, *north_label;
+    lv_obj_t *house_label, *status_label, *info_label, *range_label;
     lv_obj_t *ring_label[4];
     uint8_t *bg_buf = nullptr;
     uint8_t *fg_buf = nullptr;
@@ -378,15 +375,24 @@ private:
         int hs = SCALE_PX(5);
         bg_rect(origin_x - hs / 2, origin_y - hs / 2, hs, hs, lv_color_to_u16(lv_color_hex(0xffb347)));
 
-        // north marker: small compass in the top-right corner, rotated so that
-        // true north points in its real screen direction
-        int32_t nx = w - SCALE_PX(34), ny = SCALE_PX(34);
-        bg_circle(nx, ny, SCALE_PX(16), lv_color_to_u16(lv_color_hex(0xd06060)), SCALE_PX(1));
-        float nrad = (0.0f - RADAR_UP_BEARING) * (float)M_PI / 180.0f;
-        float nex = nx + SCALE_PX(13) * sinf(nrad);
-        float ney = ny - SCALE_PX(13) * cosf(nrad);
-        bg_line(nx, ny, nex, ney, lv_color_to_u16(lv_color_hex(0xd06060)), SCALE_PX(2));
-        lv_obj_set_pos(north_label, (int32_t)nex - SCALE_PX(4), (int32_t)ney - SCALE_PX(14));
+        // north arrow, top-right corner: a single filled arrow pointing toward
+        // true north. Screen-up = RADAR_UP_BEARING, so north is at screen angle
+        // (0 - UP). The origin (house) is fixed, so a static arrow is enough.
+        {
+            int32_t nx = w - SCALE_PX(26), ny = SCALE_PX(28);
+            float sa = (0.0f - RADAR_UP_BEARING) * (float)M_PI / 180.0f;
+            float ca = cosf(sa), sn = sinf(sa);
+            // local arrow shape pointing "up" (y+), tapered shaft + solid head
+            float L = SCALE_PX(18), HL = SCALE_PX(6), HW = SCALE_PX(7), SW = SCALE_PX(2);
+            float lx[7] = { 0, HW / 2, SW / 2, SW / 2, -SW / 2, -SW / 2, -HW / 2 };
+            float ly[7] = { L, L - HL, L - HL, 0, 0, L - HL, L - HL };
+            float fx[7], fy[7];
+            for (int i = 0; i < 7; i++) {
+                fx[i] = nx + lx[i] * ca + ly[i] * sn;
+                fy[i] = ny - ly[i] * ca + lx[i] * sn;
+            }
+            bg_fill_polygon(fx, fy, 7, lv_color_to_u16(lv_color_hex(0xff5050)));
+        }
 
         lv_obj_invalidate(bg_canvas);
     }
@@ -527,7 +533,7 @@ private:
     }
 };
 
-const float RadarGauge::RANGES_NM[] = { 5.0f, 10.0f, 20.0f, 40.0f };
-const int RadarGauge::NUM_RANGES = 4;
+const float RadarGauge::RANGES_NM[] = { 5.0f, 10.0f, 20.0f };
+const int RadarGauge::NUM_RANGES = 3;
 
 #endif // RADARGAUGE_H

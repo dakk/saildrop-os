@@ -53,10 +53,17 @@ void my_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
     data->point.x = td.x;
     data->point.y = td.y;
 
+#if defined(DEBUG) && DEBUG
+    if (td.gestureID != HAL_GESTURE_NONE)
+        Serial.printf("touch: gesture=%d (%s) at %d,%d\n", td.gestureID,
+                      hal().getGestureName().c_str(), td.x, td.y);
+#endif
+
     if (tick - last_gesture_tick < 50) return;
 
-    if (td.gestureID == HAL_GESTURE_SWIPE_UP || td.gestureID == HAL_GESTURE_SWIPE_DOWN) {
-        radar->cycle_range();
+    if (td.gestureID == HAL_GESTURE_SWIPE_UP || td.gestureID == HAL_GESTURE_SWIPE_DOWN ||
+        td.gestureID == HAL_GESTURE_SWIPE_LEFT || td.gestureID == HAL_GESTURE_SWIPE_RIGHT) {
+        radar->cycle_range();  // any swipe cycles the range
         last_gesture_tick = tick;
     } else if (td.gestureID == HAL_GESTURE_SINGLE_CLICK) {
         radar->select_at(td.x, td.y);

@@ -72,6 +72,13 @@ int main() {
         lv_timer_handler();
     }
 
+    // exercise range switching (what a swipe triggers) and verify it repaints
+    uint32_t ring_before = count_color(lv_color_to_u16(lv_color_hex(0x1f5c38)));
+    radar.cycle_range();  // 20 -> 40 NM
+    for (int i = 0; i < 50; i++) { g_millis += 2; lv_tick_inc(2); lv_timer_handler(); }
+    uint32_t ring_after = count_color(lv_color_to_u16(lv_color_hex(0x1f5c38)));
+    printf("ring px before/after 4x cycle_range: %u -> %u\n", ring_before, ring_after);
+
     // expected colors (RGB565)
     uint16_t sea   = lv_color_to_u16(lv_color_hex(0x0b1d26));
     uint16_t land  = lv_color_to_u16(lv_color_hex(0x33301f));
@@ -106,6 +113,15 @@ int main() {
     NEED(n_sweep > 100, "sweep line drawn (%u px)", n_sweep);
     NEED(n_blip > 10, "blip drawn (%u px)", n_blip);
     NEED(n_black < W * H / 2, "screen not mostly black (black=%u)", n_black);
+    NEED(ring_after != ring_before && ring_after > 100, "cycle_range repaints rings (%u -> %u)", ring_before, ring_after);
+
+    // compass rose in the top-right corner: red-ish pixels present there
+    uint16_t red = lv_color_to_u16(lv_color_hex(0xff5050));
+    uint32_t n_red = 0;
+    for (int y = 0; y < 100; y++)
+        for (int x = W - 100; x < W; x++)
+            if (fb[y * W + x] == red) n_red++;
+    NEED(n_red > 50, "north arrow drawn top-right (%u red px)", n_red);
 
     printf("%s (%d failures)\n", fails ? "RENDER FAILED" : "RENDER OK", fails);
     return fails ? 1 : 0;
