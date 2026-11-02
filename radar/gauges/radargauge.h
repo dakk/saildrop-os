@@ -28,6 +28,7 @@
 #include "common/scale.h"
 #include "common/geo.h"
 #include "common/ais.h"
+#include "common/gauges/battery.h"
 #include "../conn.h"
 #include "../coastline.h"
 
@@ -80,6 +81,10 @@ public:
             lv_obj_set_style_text_color(ring_label[i], lv_color_hex(0xa04040), 0);
             lv_obj_set_style_text_font(ring_label[i], ui_scale::font_small(), 0);
         }
+
+        // battery widget, top-left (shore power shows the USB icon)
+        batt = new BatteryGauge(bg, LV_ALIGN_TOP_LEFT, SCALE_PX(6), SCALE_PX(4), false);
+        batt->start(5000);
 
         house_label = lv_label_create(bg);
         lv_label_set_text(house_label, LV_SYMBOL_HOME);
@@ -161,6 +166,7 @@ private:
     lv_obj_t *house_label, *status_label, *info_label, *range_label;
     lv_obj_t *ring_label[4];
     lv_obj_t *name_label[6];  // vessel names at closest range
+    BatteryGauge *batt;
     uint8_t *bg_buf = nullptr;     // canvas buffer (static picture + blips)
     uint8_t *bg_static = nullptr;  // pristine copy of the static picture
     uint32_t stride = 0;

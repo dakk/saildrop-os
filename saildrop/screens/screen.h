@@ -16,12 +16,17 @@
 #ifndef SCREEN_H
 #define SCREEN_H
 
+#include "../common/gauges/battery.h"
+
 lv_obj_t *default_screen_create()
 {
     lv_obj_t *scr = lv_obj_create(NULL);
     lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(scr, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    // battery charge icon, top-left of every screen (shared widget)
+    BatteryGauge *batt = new BatteryGauge(scr, LV_ALIGN_TOP_LEFT, 4, 4, true);
+    batt->start(5000);
     return scr;
 }
 

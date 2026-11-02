@@ -199,6 +199,16 @@ int main() {
         }
     }
 
+    // battery widget top-left (shore power -> gray USB icon)
+    {
+        uint16_t gray = lv_color_to_u16(lv_color_hex(0x9fb8a8));
+        uint32_t n_gray = 0;
+        for (int y = 0; y < 40; y++)
+            for (int x = 0; x < 40; x++)
+                if (fb[y * W + x] == gray) n_gray++;
+        NEED(n_gray > 20, "battery icon drawn top-left (%u gray px)", n_gray);
+    }
+
     // compass rose in the top-right corner: red-ish pixels present there
     uint16_t red = lv_color_to_u16(lv_color_hex(0xff5050));
     uint32_t n_red = 0;
