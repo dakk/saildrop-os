@@ -24,7 +24,9 @@ SerialStub Serial;
 WiFiClass WiFi;
 
 #include <lvgl.h>
+#define private public   // test inspects internals (info_label, proj)
 #include "../radar/gauges/radargauge.h"   // pulls conf.h, common/*, conn.h (stubbed WiFi)
+#undef private
 
 // ---- dummy display with a framebuffer ----
 #define W 480
@@ -114,6 +116,25 @@ int main() {
     NEED(n_blip > 10, "blip drawn (%u px)", n_blip);
     NEED(n_black < W * H / 2, "screen not mostly black (black=%u)", n_black);
     NEED(ring_after != ring_before && ring_after > 100, "cycle_range repaints rings (%u -> %u)", ring_before, ring_after);
+
+    // tap-select the injected target and check the info label text
+    {
+        const ais_target *t = nullptr;
+        for (int i = 0; i < AIS_MAX_TARGETS; i++) {
+            const ais_target *x = get_ais_manager()->get_target(i);
+            if (x->valid && x->mmsi == 247000001) t = x;
+        }
+        float bx, by;
+        geo_project(t->lat, t->lon, radar.proj, bx, by);
+        radar.select_at((int32_t)bx, (int32_t)by);
+        lv_timer_handler();
+        const char *txt = lv_label_get_text(radar.info_label);
+        printf("info label: '%s'\n", txt);
+        NEED(strstr(txt, "TESTBOAT") != nullptr, "info shows name");
+        NEED(strstr(txt, "12.0kn") != nullptr, "info shows speed as 12.0kn (got '%s')", txt);
+        NEED(strstr(txt, "135deg") != nullptr, "info shows cog 135deg");
+        NEED(strstr(txt, "fkn") == nullptr, "no broken float format");
+    }
 
     // compass rose in the top-right corner: red-ish pixels present there
     uint16_t red = lv_color_to_u16(lv_color_hex(0xff5050));

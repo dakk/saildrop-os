@@ -456,13 +456,21 @@ private:
         geo_cpa(HOME_LAT, HOME_LON, t->lat, t->lon, t->cog / 10.0f, t->sog / 10.0f, cpa_nm, tcpa_h);
         char buf[96];
         const char *name = t->name[0] ? t->name : "-----";
-        if (tcpa_h > 0.0f)
-            lv_snprintf(buf, sizeof(buf), "%s %lu\n%.1fkn %03ddeg %.1fnm @%03d\nCPA %.1fnm in %dmin",
-                        name, (unsigned long)t->mmsi, t->sog / 10.0f, (int)(t->cog / 10.0f), dist, (int)brg,
-                        cpa_nm, (int)(tcpa_h * 60.0f));
-        else
-            lv_snprintf(buf, sizeof(buf), "%s %lu\n%.1fkn %03ddeg %.1fnm @%03d",
-                        name, (unsigned long)t->mmsi, t->sog / 10.0f, (int)(t->cog / 10.0f), dist, (int)brg);
+        // NOTE: lv_snprintf has no float support unless LV_USE_FLOAT is on,
+        // so format tenths as integers: "%d.%d" (AIS already stores 0.1 units)
+        int sog10 = t->sog;
+        int dist10 = (int)(dist * 10.0f + 0.5f);
+        if (tcpa_h > 0.0f) {
+            int cpa10 = (int)(cpa_nm * 10.0f + 0.5f);
+            int tcpa_min = (int)(tcpa_h * 60.0f + 0.5f);
+            lv_snprintf(buf, sizeof(buf), "%s %lu\n%d.%dkn %03ddeg %d.%dnm @%03d\nCPA %d.%dnm in %dmin",
+                        name, (unsigned long)t->mmsi, sog10 / 10, sog10 % 10, (int)(t->cog / 10.0f),
+                        dist10 / 10, dist10 % 10, (int)brg, cpa10 / 10, cpa10 % 10, tcpa_min);
+        } else {
+            lv_snprintf(buf, sizeof(buf), "%s %lu\n%d.%dkn %03ddeg %d.%dnm @%03d",
+                        name, (unsigned long)t->mmsi, sog10 / 10, sog10 % 10, (int)(t->cog / 10.0f),
+                        dist10 / 10, dist10 % 10, (int)brg);
+        }
         lv_label_set_text(info_label, buf);
     }
 
